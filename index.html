@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>销售客户管理系统</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- 移动端顶部导航 -->
+  <header class="mobile-header" id="mobile-header">
+    <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="打开菜单">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    <div class="mobile-header-title" id="mobile-header-title">工作台</div>
+    <button onclick="cycleTheme()" title="切换主题" class="mobile-theme-btn" aria-label="切换主题" id="theme-toggle-icon">🌙</button>
+  </header>
+
+  <!-- 侧边栏遮罩层（移动端） -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileMenu()"></div>
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img id="site-logo" src="" alt="logo">
+      <div class="logo-icon">📊</div>
+      <div id="site-title">销售客户管理系统</div>
+      <button class="sidebar-close-btn" id="sidebar-close-btn" onclick="closeMobileMenu()" aria-label="关闭菜单">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="nav-section">核心功能</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <span class="nav-icon">🏠</span> 工作台
+    </div>
+    <div class="nav-item" data-page="customers" onclick="navigateTo('customers')">
+      <span class="nav-icon">👥</span> 客户管理
+    </div>
+    <div class="nav-item" data-page="orders" onclick="navigateTo('orders')">
+      <span class="nav-icon">📋</span> 订单管理
+    </div>
+    <div class="nav-item" data-page="cards" onclick="navigateTo('cards')">
+      <span class="nav-icon">🔑</span> 卡密库
+    </div>
+
+    <div class="nav-section">商品与数据</div>
+    <div class="nav-item" data-page="products" onclick="navigateTo('products')">
+      <span class="nav-icon">📦</span> 商品管理
+    </div>
+    <div class="nav-item" data-page="stats" onclick="navigateTo('stats')">
+      <span class="nav-icon">📈</span> 数据统计
+    </div>
+
+    <div class="nav-section">系统</div>
+    <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+      <span class="nav-icon">⚙️</span> 系统设置
+    </div>
+
+    <!-- 快捷主题切换（桌面端） -->
+    <div class="sidebar-bottom">
+      <button onclick="cycleTheme()" title="切换主题" style="background:var(--bg-hover);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;" id="theme-toggle-icon-dt">🌙</button>
+      <span style="color:var(--text-muted);font-size:12px;align-self:center;">切换主题</span>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main-content" id="main-content">
+    <div id="page-dashboard" class="page-section"></div>
+    <div id="page-customers" class="page-section" style="display:none"></div>
+    <div id="page-orders" class="page-section" style="display:none"></div>
+    <div id="page-cards" class="page-section" style="display:none"></div>
+    <div id="page-products" class="page-section" style="display:none"></div>
+    <div id="page-stats" class="page-section" style="display:none"></div>
+    <div id="page-settings" class="page-section" style="display:none"></div>
+  </main>
+</div>
+
+<!-- 移动端底部快捷栏 -->
+<nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <div class="mobile-nav-item" data-page="dashboard" onclick="navigateTo('dashboard')">
+    <span class="mobile-nav-icon">🏠</span>
+    <span>工作台</span>
+  </div>
+  <div class="mobile-nav-item" data-page="orders" onclick="navigateTo('orders')">
+    <span class="mobile-nav-icon">📋</span>
+    <span>订单</span>
+  </div>
+  <div class="mobile-nav-item" data-page="customers" onclick="navigateTo('customers')">
+    <span class="mobile-nav-icon">👥</span>
+    <span>客户</span>
+  </div>
+  <div class="mobile-nav-item" data-page="cards" onclick="navigateTo('cards')">
+    <span class="mobile-nav-icon">🔑</span>
+    <span>卡密</span>
+  </div>
+  <div class="mobile-nav-item" data-page="settings" onclick="navigateTo('settings')">
+    <span class="mobile-nav-icon">⚙️</span>
+    <span>设置</span>
+  </div>
+</nav>
+
+<!-- JS模块加载（顺序很重要） -->
+<script src="核心工具.js"></script>
+<script src="工作台.js"></script>
+<script src="客户管理.js"></script>
+<script src="订单管理.js"></script>
+<script src="卡密库.js"></script>
+<script src="商品管理.js"></script>
+<script src="数据统计.js"></script>
+<script src="系统设置.js"></script>
+<script src="扩展功能.js"></script>
+
+<script>
+// 移动端菜单控制
+function toggleMobileMenu() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var isOpen = sidebar.classList.contains('mobile-open');
+  if (isOpen) {
+    closeMobileMenu();
+  } else {
+    sidebar.classList.add('mobile-open');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeMobileMenu() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// 导航时自动关闭移动端菜单
+var _origNavigateTo = navigateTo;
+navigateTo = function(page) {
+  _origNavigateTo(page);
+  if (window.innerWidth < 768) closeMobileMenu();
+  // 更新移动端顶部标题
+  var titles = { dashboard:'工作台', customers:'客户管理', orders:'订单管理', cards:'卡密库', products:'商品管理', stats:'数据统计', settings:'系统设置' };
+  var el = document.getElementById('mobile-header-title');
+  if (el) el.textContent = titles[page] || page;
+  // 更新底部导航激活状态
+  document.querySelectorAll('.mobile-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.page === page);
+  });
+};
+
+// 关闭下拉菜单（点击外部）
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('[id$="-dropdown"]') && !e.target.closest('#of-cardSearch') && !e.target.closest('#nc-search')) {
+    document.querySelectorAll('.custom-dropdown').forEach(function(d){ d.style.display = 'none'; });
+  }
+});
+
+// 初始化应用
+document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>

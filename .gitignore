@@ -1,0 +1,4 @@
+node_modules/
+*.zip
+vercel.json
+gh_api_token.txt
