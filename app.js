@@ -87,12 +87,16 @@ function navigateTo(page) {
   // 激活对应导航项
   const link = document.querySelector('[data-page="' + page + '"]');
   if (link) link.classList.add('active');
-  // 页面切换时调用对应的渲染函数
+  // 页面切换时调用对应的渲染函数（函数可能在其他JS文件中定义，使用window访问）
   const fns = {
-    dashboard: renderDashboard, customers: renderCustomers,
-    orders: renderOrders, cards: renderCards,
-    products: renderProducts, stats: renderStats,
-    settings: renderSettings
+    dashboard: renderDashboard,
+    customers: renderCustomers,
+    'sw-orders': window.renderSwOrders || renderSwOrders,
+    'hw-orders': window.renderHwOrders || renderHwOrders,
+    products: window.renderProducts || function(){},
+    keycodes: window.renderKeycodes || function(){},
+    settings: window.renderSettings || function(){},
+    'data-mgr': window.renderDataMgr || function(){}
   };
   if (fns[page]) {
     try { fns[page](); } catch (e) { console.error(page + ' render error:', e); }
@@ -1015,3 +1019,24 @@ function doCopyHwOrder() {
   copyText(text, '订单信息');
   closeModal('modal-copy-hw');
 }
+
+// ========== 导航菜单点击事件 ==========
+// 使用事件委托处理左侧菜单和移动端底部导航
+document.addEventListener('click', function(e) {
+  // 左侧菜单项
+  const navItem = e.target.closest('.nav-item');
+  if (navItem && navItem.dataset.page) {
+    e.preventDefault();
+    navigateTo(navItem.dataset.page);
+    // 移动端：点击后收起侧边栏
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('open');
+    return;
+  }
+  // 移动端底部导航
+  const mobileNav = e.target.closest('.mobile-nav-item');
+  if (mobileNav && mobileNav.dataset.page) {
+    e.preventDefault();
+    navigateTo(mobileNav.dataset.page);
+  }
+});
