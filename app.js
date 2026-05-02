@@ -76,36 +76,41 @@ const PAGE_TITLES = {
 };
 
 function navigateTo(page) {
-  document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
-  document.querySelectorAll('#sidebar nav a').forEach(function (a) { a.classList.remove('active'); });
+  // 隐藏所有页面
+  document.querySelectorAll('.page-section').forEach(function (p) { p.style.display = 'none'; });
+  // 取消所有导航项的激活状态
+  document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
+  document.querySelectorAll('.mobile-nav-item').forEach(function (n) { n.classList.remove('active'); });
+  // 显示目标页面
   const pg = document.getElementById('page-' + page);
-  if (pg) pg.classList.add('active');
+  if (pg) pg.style.display = 'block';
+  // 激活对应导航项
   const link = document.querySelector('[data-page="' + page + '"]');
   if (link) link.classList.add('active');
-  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  // 页面切换时调用对应的渲染函数
   const fns = {
     dashboard: renderDashboard, customers: renderCustomers,
-    'sw-orders': renderSwOrders, 'hw-orders': renderHwOrders,
-    products: renderProducts, keycodes: renderKeycodes, settings: renderSettings
+    orders: renderOrders, cards: renderCards,
+    products: renderProducts, stats: renderStats,
+    settings: renderSettings
   };
-  if (fns[page]) fns[page]();
+  if (fns[page]) {
+    try { fns[page](); } catch (e) { console.error(page + ' render error:', e); }
+  }
 }
 
-document.querySelectorAll('#sidebar nav a').forEach(function (a) {
-  a.addEventListener('click', function (e) { e.preventDefault(); navigateTo(a.dataset.page); });
-});
-
-// tab切换
-document.querySelectorAll('.tab-btn').forEach(function (btn) {
-  btn.addEventListener('click', function () {
-    const nav = btn.closest('.tab-nav');
-    nav.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    const contentContainer = nav.parentElement;
-    contentContainer.querySelectorAll('.tab-content').forEach(function (tc) { tc.classList.add('hidden'); });
-    const target = contentContainer.querySelector('#tab-' + btn.dataset.tab);
-    if (target) target.classList.remove('hidden');
-  });
+// tab切换（通过事件委托，支持动态内容）
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  const nav = btn.closest('.tab-nav');
+  if (!nav) return;
+  nav.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  const contentContainer = nav.parentElement;
+  contentContainer.querySelectorAll('.tab-content').forEach(function (tc) { tc.classList.add('hidden'); });
+  const target = contentContainer.querySelector('#tab-' + btn.dataset.tab);
+  if (target) target.classList.remove('hidden');
 });
 
 // ============================================================
@@ -116,6 +121,20 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 document.querySelectorAll('.modal-overlay').forEach(function (o) {
   o.addEventListener('click', function (e) { if (e.target === o) o.classList.remove('show'); });
 });
+
+// ============================================================
+// 初始化应用
+// ============================================================
+function initApp() {
+  // 初始化默认数据
+  initDefaultData();
+  // 显示工作台
+  navigateTo('dashboard');
+  // 渲染工作台内容
+  if (typeof renderDashboard === 'function') {
+    try { renderDashboard(); } catch (e) { console.error('Dashboard render error:', e); }
+  }
+}
 
 // ============================================================
 // 分页
