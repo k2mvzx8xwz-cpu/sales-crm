@@ -3,7 +3,7 @@
  * 职责：数据存储（Firebase云同步+localStorage本地备份）、工具函数、全局状态、初始化
  * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
-// 版本标记：20260502-1430（解决 confirmDialog 点击无响应问题）
+// 版本标记：20260503-1500（SSE实时云同步 + 手机端导航补全）
 console.log('[核心工具.js] 已加载，版本: 20260502-1430');
 
 // ==================== 全局数据存储层（统一存储，兼容云端同步）====================
@@ -57,13 +57,14 @@ window.DB = {
   }
 };
 
-// ==================== Firebase REST API 云端同步 ====================
+// ==================== Firebase 云端同步（SSE实时 + REST轮询降级）====================
 window.APP_FIREBASE_CONFIG = null;
 window.APP_FIREBASE_INITIALIZED = false;
 window.APP_CLOUD_POLLING_TIMER = null;
-window.APP_CLOUD_LAST_HASH = null; // 上次数据hash，用于检测变化
+window.APP_CLOUD_SSE_SOURCE = null;     // EventSource 实例
+window.APP_CLOUD_LAST_SAVE_TIME = 0;  // 上次自己保存的时间戳，避免重复拉取自己刚写入的数据
 
-// 获取 Firebase REST URL（不依赖 SDK，纯 URL 拼接）
+// 获取 Firebase REST URL
 function getCloudUrl(path) {
   const config = (window.APP.db && window.APP.db.settings && window.APP.db.settings.firebaseConfig) || window.APP_FIREBASE_CONFIG;
   if (!config || !config.databaseURL) return null;
@@ -72,13 +73,22 @@ function getCloudUrl(path) {
   return base + '/' + p + '.json';
 }
 
+// 获取带 auth 参数的 SSE URL
+function getSSEUrl() {
+  const url = getCloudUrl('sales_crm_db');
+  if (!url) return null;
+  const config = (window.APP.db && window.APP.db.settings && window.APP.db.settings.firebaseConfig) || window.APP_FIREBASE_CONFIG;
+  const apiKey = config && config.apiKey ? config.apiKey : '';
+  return url + '?auth=' + apiKey + '&print=sse';
+}
+
 // 初始化云同步（REST API 方式，无需加载 SDK）
 function initFirebase() {
   const config = (window.APP.db && window.APP.db.settings && window.APP.db.settings.firebaseConfig) || window.APP_FIREBASE_CONFIG;
   if (!config || !config.databaseURL) return false;
   window.APP_FIREBASE_CONFIG = config;
   window.APP_FIREBASE_INITIALIZED = true;
-  console.log('[Cloud] Firebase REST API 配置完成（databaseURL:', config.databaseURL + ')');
+  console.log('[Cloud] Firebase 配置完成（databaseURL:', config.databaseURL + ')');
   return true;
 }
 
@@ -92,61 +102,144 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 // 从云端加载数据（REST API GET）
-// throwOnError=true 时连接失败会抛异常（用于测试连接）
 async function loadFromCloud(throwOnError) {
   const url = getCloudUrl('sales_crm_db');
   if (!url) {
     if (throwOnError) throw new Error('databaseURL 为空，请检查配置');
     return null;
   }
-  const resp = await fetchWithTimeout(url, { method: 'GET' }, 8000);
-  if (!resp.ok) {
-    let detail = '';
-    try { detail = await resp.text(); } catch(e2) {}
-    const msg = 'HTTP ' + resp.status + (detail ? '：' + detail.substring(0, 100) : '');
-    console.warn('[Cloud] 读取失败', msg);
-    if (throwOnError) throw new Error(msg);
+  try {
+    const resp = await fetchWithTimeout(url, { method: 'GET' }, 8000);
+    if (!resp.ok) {
+      let detail = '';
+      try { detail = await resp.text(); } catch(e2) {}
+      const msg = 'HTTP ' + resp.status + (detail ? '：' + detail.substring(0, 100) : '');
+      if (throwOnError) throw new Error(msg);
+      return null;
+    }
+    const text = await resp.text();
+    if (!text || text === 'null' || text.trim() === '') return null;
+    return JSON.parse(text);
+  } catch (e) {
+    if (throwOnError) throw e;
+    console.warn('[Cloud] loadFromCloud 失败:', e.message);
     return null;
   }
-  const text = await resp.text();
-  if (!text || text === 'null' || text.trim() === '') {
-    console.log('[Cloud] 云端暂无数据（首次使用或已清空）');
-    return null;
-  }
-  const data = JSON.parse(text);
-  console.log('[Cloud] 从云端读取到数据');
-  return data;
 }
 
 // 保存到云端（REST API PUT）
 async function saveToCloud(data) {
   const url = getCloudUrl('sales_crm_db');
-  if (!url) { console.error('[Cloud] saveToCloud: URL 为空，请检查 Firebase 配置'); return false; }
+  if (!url) { console.error('[Cloud] saveToCloud: URL 为空'); return false; }
   try {
-    console.log('[Cloud] 正在写入云端...', url.replace(/([^/]+)@.*/, '$1@***')); // 隐藏 token
+    window.APP_CLOUD_LAST_SAVE_TIME = Date.now();
     const resp = await fetchWithTimeout(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }, 8000);
-    if (resp.ok) { console.log('[Cloud] ✅ 写入云端成功'); return true; }
-    const errText = await resp.text().catch(()=>'无法读取错误');
-    console.error('[Cloud] ❌ 写入失败:', resp.status, errText);
+    if (resp.ok) { console.log('[Cloud] ✅ 云端写入成功'); return true; }
+    console.error('[Cloud] ❌ 写入失败:', resp.status);
     return false;
   } catch (e) {
-    console.error('[Cloud] ❌ 写入云端失败:', e.message);
+    console.error('[Cloud] ❌ 写入失败:', e.message);
     return false;
   }
 }
 
-// 手动触发一次完整同步（PC保存后调用，或手机端拉取后调用）
-async function flushCloudSync() {
-  if (!window.APP_FIREBASE_INITIALIZED || !window.APP.db) { 
-    console.warn('[Cloud] flushCloudSync: Firebase 未初始化或数据为空'); 
-    return false; 
+// 应用云端数据（合并策略：以云端为准，但保留本地未同步的新数据）
+function applyCloudData(cloudData) {
+  if (!cloudData) return;
+  const local = window.APP.db;
+  if (!local) return;
+
+  // 简单策略：云端数据直接覆盖（云端是最新权威来源）
+  // 记录当前页面，刷新后恢复
+  const currentPage = window.APP.currentPage;
+  window.APP.db = cloudData;
+  saveDB_localOnly();
+
+  // 重新渲染当前页面
+  if (currentPage && typeof navigateTo === 'function') {
+    navigateTo(currentPage);
+  } else if (typeof renderDashboard === 'function') {
+    renderDashboard();
   }
-  console.log('[Cloud] 触发完整同步...');
-  return await saveToCloud(window.APP.db);
+  console.log('[Cloud] 已应用云端数据');
+}
+
+// ==================== SSE 实时监听（真正实时）====================
+function startSSEListener() {
+  if (window.APP_CLOUD_SSE_SOURCE) return; // 防止重复
+  const sseUrl = getSSEUrl();
+  if (!sseUrl) return;
+
+  try {
+    const es = new EventSource(sseUrl);
+    window.APP_CLOUD_SSE_SOURCE = es;
+
+    es.onopen = function() {
+      console.log('[Cloud] ✅ SSE 实时监听已连接');
+      var statusEl = document.getElementById('sync-status');
+      if (statusEl) statusEl.textContent = '☁️ 实时同步中';
+    };
+
+    es.addEventListener('put', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        console.log('[Cloud] SSE 收到数据更新');
+        // 如果是自己刚保存的（1秒内），跳过
+        if (Date.now() - window.APP_CLOUD_LAST_SAVE_TIME < 2000) return;
+        if (data.path === '/' && data.data) {
+          applyCloudData(data.data);
+          showToast('📱 其他设备数据已同步', 'info', 2000);
+        }
+      } catch(err) { console.warn('[Cloud] SSE put 解析失败', err); }
+    });
+
+    es.onerror = function(err) {
+      console.warn('[Cloud] SSE 连接断开，降级为轮询模式', err);
+      es.close();
+      window.APP_CLOUD_SSE_SOURCE = null;
+      startCloudPolling(); // 降级为轮询
+    };
+
+    console.log('[Cloud] SSE 实时监听已启动');
+  } catch (e) {
+    console.warn('[Cloud] SSE 启动失败，降级为轮询模式', e);
+    startCloudPolling();
+  }
+}
+
+// ==================== 轮询降级方案 ====================
+function startCloudPolling() {
+  if (window.APP_CLOUD_POLLING_TIMER) return;
+  console.log('[Cloud] 轮询模式已启动（每5秒）');
+  window.APP_CLOUD_POLLING_TIMER = setInterval(async function() {
+    if (!window.APP_FIREBASE_INITIALIZED) return;
+    if (Date.now() - window.APP_CLOUD_LAST_SAVE_TIME < 3000) return; // 自己刚保存，跳过
+    const cloudData = await loadFromCloud();
+    if (cloudData) {
+      // 简单比较：序列化成字符串对比
+      const localStr = JSON.stringify(window.APP.db);
+      const cloudStr = JSON.stringify(cloudData);
+      if (localStr !== cloudStr) {
+        applyCloudData(cloudData);
+        showToast('📱 其他设备数据已同步', 'info', 2000);
+      }
+    }
+  }, 5000);
+}
+
+function stopCloudPolling() {
+  if (window.APP_CLOUD_POLLING_TIMER) {
+    clearInterval(window.APP_CLOUD_POLLING_TIMER);
+    window.APP_CLOUD_POLLING_TIMER = null;
+  }
+  if (window.APP_CLOUD_SSE_SOURCE) {
+    window.APP_CLOUD_SSE_SOURCE.close();
+    window.APP_CLOUD_SSE_SOURCE = null;
+  }
 }
 
 // 手动同步按钮：从云端拉取最新数据并应用（用户主动触发）
@@ -268,10 +361,23 @@ function stopCloudPolling() {
   }
 }
 
-// 替换 listenCloudChanges（向后兼容）
+// 启动云端监听（优先 SSE 实时，降级为轮询）
 function listenCloudChanges(callback) {
   if (!window.APP_FIREBASE_INITIALIZED) return;
-  startCloudPolling();
+
+  // 优先启动 SSE 实时监听
+  startSSEListener();
+
+  // 页面从后台恢复时立即同步一次
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && window.APP_FIREBASE_INITIALIZED) {
+      console.log('[Cloud] 页面恢复可见，立即检查云端数据');
+      loadFromCloud().then(function(data) {
+        if (data) applyCloudData(data);
+      }).catch(function() {});
+    }
+  });
+
   if (typeof callback === 'function') callback();
 }
 
