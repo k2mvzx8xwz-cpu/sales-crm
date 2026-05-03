@@ -921,6 +921,7 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
 @media (max-width: 768px) {
   /* 隐藏桌面端侧边栏主题切换，显示底部导航 */
   .sidebar .sidebar-bottom { display: none !important; }
+  .mobile-bottom-nav { display: flex !important; }
 
   /* 主内容区：去掉侧边栏宽度偏移，底部留出导航栏空间 */
   .main-content {
