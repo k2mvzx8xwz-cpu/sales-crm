@@ -4,7 +4,7 @@
  * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
 // 版本标记：20260503-1730（修复：添加强制同步按钮、清空云端数据功能）
-console.log('[核心工具.js] 已加载，版本: 20260502-1430');
+console.log('[核心工具.js] 已加载，版本: 202605040110');
 
 // ==================== 全局数据存储层（统一存储，兼容云端同步）====================
 window.DB = {
@@ -95,14 +95,15 @@ function initFirebase() {
 // 确保db结构完整（防止云端数据缺少某些字段导致undefined）
 function normalizeDB(db) {
   db = db || {};
-  db.customers = db.customers || [];
-  db.orders = db.orders || [];
-  db.products = db.products || [];
-  db.keys = db.keys || [];
+  db.customers = Array.isArray(db.customers) ? db.customers : [];
+  db.orders = Array.isArray(db.orders) ? db.orders : [];
+  db.products = Array.isArray(db.products) ? db.products : [];
+  db.cards = Array.isArray(db.cards) ? db.cards : [];
+  db.keys = Array.isArray(db.keys) ? db.keys : [];
   db.settings = db.settings || {};
   // 保护 orderManagement.orders
   db.orderManagement = db.orderManagement || {};
-  db.orderManagement.orders = db.orderManagement.orders || [];
+  db.orderManagement.orders = Array.isArray(db.orderManagement.orders) ? db.orderManagement.orders : [];
   return db;
 }
 
