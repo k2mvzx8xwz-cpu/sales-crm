@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>测试页</title></head>
+<body>
+<h1>测试页 - 如果看到这行说明服务器正常</h1>
+<div id="step1" style="color:green;font-size:18px;"></div>
+<div id="step2" style="color:blue;font-size:18px;"></div>
+<div id="step3" style="color:red;font-size:18px;"></div>
+
+<script>
+document.getElementById('step1').textContent = '✅ Step 1: HTML 加载成功';
+
+try {
+  // 测试加载 核心工具.js
+  var s = document.createElement('script');
+  s.src = '核心工具.js?v=202605031200';
+  s.onload = function() {
+    document.getElementById('step2').textContent = '✅ Step 2: 核心工具.js 加载成功';
+    if (typeof initApp === 'function') {
+      document.getElementById('step3').textContent = '✅ Step 3: initApp 函数已定义，准备调用...';
+      setTimeout(function() {
+        try {
+          initApp();
+          document.getElementById('step3').textContent = '✅ Step 4: initApp() 调用成功！';
+        } catch(e) {
+          document.getElementById('step3').textContent = '❌ Step 4 失败: ' + e.message;
+        }
+      }, 1000);
+    } else {
+      document.getElementById('step3').textContent = '❌ 核心工具.js 已加载，但 initApp 未定义！';
+    }
+  };
+  s.onerror = function() {
+    document.getElementById('step2').textContent = '❌ Step 2 失败: 核心工具.js 加载失败（404 或路径错误）';
+  };
+  document.head.appendChild(s);
+} catch(e) {
+  document.body.innerHTML += '<p style="color:red;">异常: ' + e.message + '</p>';
+}
+</script>
+</body>
+</html>
