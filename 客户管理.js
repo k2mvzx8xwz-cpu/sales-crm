@@ -41,9 +41,9 @@ function renderCustomers() {
     </div>
     <div class="toolbar">
       <div class="filter-tabs">
-        <button class="filter-tab ${customerFilter === 'all' ? 'active' : ''}" onclick="setCustomerFilter('all')">全部 (${db.customers.length})</button>
-        <button class="filter-tab ${customerFilter === 'software' ? 'active' : ''}" onclick="setCustomerFilter('software')">软件 (${db.customers.filter(c=>c.type==='software').length})</button>
-        <button class="filter-tab ${customerFilter === 'hardware' ? 'active' : ''}" onclick="setCustomerFilter('hardware')">硬件 (${db.customers.filter(c=>c.type==='hardware').length})</button>
+        <button class="filter-tab ${customerFilter === 'all' ? 'active' : ''}" onclick="setCustomerFilter('all')">全部 (${(db.customers||[]).length})</button>
+        <button class="filter-tab ${customerFilter === 'software' ? 'active' : ''}" onclick="setCustomerFilter('software')">软件 (${(db.customers||[]).filter(c=>c.type==='software').length})</button>
+        <button class="filter-tab ${customerFilter === 'hardware' ? 'active' : ''}" onclick="setCustomerFilter('hardware')">硬件 (${(db.customers||[]).filter(c=>c.type==='hardware').length})</button>
       </div>
       <div class="search-box">
         <input type="text" id="customer-search" placeholder="搜索微信名/微信号/手机号..." value="${customerKeyword}"

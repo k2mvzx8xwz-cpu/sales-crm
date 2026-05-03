@@ -92,6 +92,17 @@ function initFirebase() {
   return true;
 }
 
+// 确保db结构完整（防止云端数据缺少某些字段导致undefined）
+function normalizeDB(db) {
+  db = db || {};
+  db.customers = db.customers || [];
+  db.orders = db.orders || [];
+  db.products = db.products || [];
+  db.keys = db.keys || [];
+  db.settings = db.settings || {};
+  return db;
+}
+
 // fetch 超时包装
 function fetchWithTimeout(url, options, timeoutMs) {
   timeoutMs = timeoutMs || 8000;
@@ -156,7 +167,7 @@ function applyCloudData(cloudData) {
   // 简单策略：云端数据直接覆盖（云端是最新权威来源）
   // 记录当前页面，刷新后恢复
   const currentPage = window.APP.currentPage;
-  window.APP.db = cloudData;
+  window.APP.db = normalizeDB(cloudData);
   saveDB_localOnly();
 
   // 重新渲染当前页面
@@ -503,13 +514,13 @@ function saveDB_localOnly() {
 async function loadDB() {
   const cloudData = await loadFromCloud();
   if (cloudData) {
-    window.APP.db = cloudData;
+    window.APP.db = normalizeDB(cloudData);
     saveDB_localOnly(); // 同步到本地备份
     return;
   }
   const localData = loadDB_localOnly();
   if (localData) {
-    window.APP.db = localData;
+    window.APP.db = normalizeDB(localData);
   } else {
     window.APP.db = getEmptyDB();
     initDefaultData();
