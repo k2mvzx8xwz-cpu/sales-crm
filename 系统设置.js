@@ -552,15 +552,17 @@ function importData(input) {
 
 // 清空全部数据
 function clearAllData() {
-  confirmDialog('⚠️ 此操作将清空所有客户、订单、卡密、购卡记录数据！\n此操作不可恢复！\n\n确定继续吗？', function() {
+  confirmDialog('⚠️ 此操作将清空所有客户、订单、卡密、购卡记录数据！\n此操作不可恢复！\n\n确定继续吗？', async function() {
     const db = window.APP.db;
     const settings = db.settings;
     const productDisplayData = db.productDisplayData;
     window.APP.db = getEmptyDB();
     window.APP.db.settings = settings;
     window.APP.db.productDisplayData = productDisplayData;
-    saveDB();
-    showToast('✅ 数据已全部清空，即将刷新页面', 'success');
+    saveDB_localOnly();
+    // 立即推送到云端（不等防抖），避免刷新后云端数据又覆盖回来
+    await saveToCloud(window.APP.db);
+    showToast('✅ 数据已全部清空并同步到云端，即将刷新页面', 'success');
     setTimeout(function(){ location.reload(); }, 1500);
   }, '确认清空全部数据');
 }
@@ -636,7 +638,7 @@ function clearSelectedData() {
   var labelMap = { customers:'客户管理', sw_orders:'软件订单', hw_orders:'硬件订单', cards:'卡密库', cardRecords:'购卡记录', products:'商品管理', sw_template:'软件订单模板', hw_template:'硬件订单模板' };
   var labels = keys.map(function(k){ return labelMap[k] || k; });
 
-  confirmDialog('⚠️ 确定清除以下数据？（此操作不可恢复）\n\n' + labels.join('、') + '\n\n点击确定继续。', function() {
+  confirmDialog('⚠️ 确定清除以下数据？（此操作不可恢复）\n\n' + labels.join('、') + '\n\n点击确定继续。', async function() {
     try {
       var raw = localStorage.getItem('销售管理数据库');
       if (!raw) { showToast('数据存储异常，无法清除', 'error'); return; }
@@ -661,12 +663,14 @@ function clearSelectedData() {
         }
       }
 
-      // 直接写入 localStorage
+      // 写入 localStorage
       localStorage.setItem('销售管理数据库', JSON.stringify(db));
-      // 同时更新内存中的 window.APP.db（保持一致性）
+      // 更新内存中的 window.APP.db
       if (window.APP && window.APP.db) window.APP.db = db;
+      // 立即推送到云端（不等防抖），避免刷新后云端数据又覆盖回来
+      await saveToCloud(db);
 
-      showToast('✅ 已清除 ' + labels.length + ' 项数据', 'success');
+      showToast('✅ 已清除 ' + labels.length + ' 项数据并同步到云端', 'success');
       initClearDataList();
     } catch(e) {
       showToast('清除失败：' + e.message, 'error');
