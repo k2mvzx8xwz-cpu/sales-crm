@@ -33,9 +33,9 @@ function renderOrders() {
     </div>
     <div class="toolbar">
       <div class="filter-tabs">
-        <button class="filter-tab ${orderFilter==='all'?'active':''}" onclick="setOrderFilter('all')">全部 (${db.orders.length})</button>
-        <button class="filter-tab ${orderFilter==='software'?'active':''}" onclick="setOrderFilter('software')">软件 (${db.orders.filter(o=>o.type==='software').length})</button>
-        <button class="filter-tab ${orderFilter==='hardware'?'active':''}" onclick="setOrderFilter('hardware')">硬件 (${db.orders.filter(o=>o.type==='hardware').length})</button>
+        <button class="filter-tab ${orderFilter==='all'?'active':''}" onclick="setOrderFilter('all')">全部 (${(db.orders||[]).length})</button>
+        <button class="filter-tab ${orderFilter==='software'?'active':''}" onclick="setOrderFilter('software')">软件 (${(db.orders||[]).filter(o=>o.type==='software').length})</button>
+        <button class="filter-tab ${orderFilter==='hardware'?'active':''}" onclick="setOrderFilter('hardware')">硬件 (${(db.orders||[]).filter(o=>o.type==='hardware').length})</button>
       </div>
       <div class="search-box">
         <input type="text" placeholder="搜索客户/产品..." value="${orderKeyword}"

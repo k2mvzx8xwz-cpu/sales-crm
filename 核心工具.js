@@ -268,7 +268,7 @@ async function syncNow() {
       const oldCount = (window.APP.db && window.APP.db.customers) ? window.APP.db.customers.length : 0;
       const newCount = cloudData.customers ? cloudData.customers.length : 0;
       
-      window.APP.db = cloudData;
+      window.APP.db = normalizeDB(cloudData);
       saveDB_localOnly();
       
       // 重新渲染当前页面
@@ -367,7 +367,7 @@ function startCloudPolling() {
         console.log('[Cloud] 检测到其他设备数据变化，正在同步...');
         const local = loadDB_localOnly();
         const merged = mergeData(local, cloudData);
-        window.APP.db = merged;
+        window.APP.db = normalizeDB(merged);
         saveDB_localOnly();
         window.APP_CLOUD_LAST_HASH = cloudHash;
         if (window.APP.currentPage) navigateTo(window.APP.currentPage);
@@ -492,11 +492,7 @@ function loadDB_localOnly() {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      if (!data.settings) data.settings = getEmptyDB().settings;
-      if (!data.cardRecords) data.cardRecords = [];
-      if (!data.productDisplayData) data.productDisplayData = {};
-      if (!data.settings.firebaseConfig) data.settings.firebaseConfig = null;
-      return data;
+      return normalizeDB(data);
     }
   } catch (e) {
     console.error('本地数据加载失败', e);
@@ -885,7 +881,7 @@ async function initApp() {
     // 第一步：立即加载本地数据并渲染（不等待云端，秒开）
     var localData = loadDB_localOnly();
     if (localData) {
-      window.APP.db = localData;
+      window.APP.db = normalizeDB(localData);
     } else {
       window.APP.db = getEmptyDB();
       initDefaultData();
@@ -968,7 +964,7 @@ async function backgroundSync(s) {
     var cloudData = await loadFromCloud();
     if (cloudData) {
       console.log('[Cloud] 云端有数据，应用云端数据');
-      window.APP.db = cloudData;
+      window.APP.db = normalizeDB(cloudData);
       saveDB_localOnly();
       if (typeof renderDashboard === 'function') renderDashboard();
       showToast('✅ 已同步云端数据（' + (cloudData.customers ? cloudData.customers.length : 0) + ' 条客户）', 'success', 3000);
