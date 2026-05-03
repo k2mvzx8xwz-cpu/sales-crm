@@ -100,12 +100,15 @@ function normalizeDB(db) {
   db.products = db.products || [];
   db.keys = db.keys || [];
   db.settings = db.settings || {};
+  // 保护 orderManagement.orders
+  db.orderManagement = db.orderManagement || {};
+  db.orderManagement.orders = db.orderManagement.orders || [];
   return db;
 }
 
-// fetch 超时包装
+// fetch 超时包装（国内网络超时设为20秒）
 function fetchWithTimeout(url, options, timeoutMs) {
-  timeoutMs = timeoutMs || 8000;
+  timeoutMs = timeoutMs || 20000;
   return Promise.race([
     fetch(url, options),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs))
@@ -120,7 +123,7 @@ async function loadFromCloud(throwOnError) {
     return null;
   }
   try {
-    const resp = await fetchWithTimeout(url, { method: 'GET' }, 8000);
+    const resp = await fetchWithTimeout(url, { method: 'GET' }, 20000);
     if (!resp.ok) {
       let detail = '';
       try { detail = await resp.text(); } catch(e2) {}
@@ -148,7 +151,7 @@ async function saveToCloud(data) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, 8000);
+    }, 20000);
     if (resp.ok) { console.log('[Cloud] ✅ 云端写入成功'); return true; }
     console.error('[Cloud] ❌ 写入失败:', resp.status);
     return false;
@@ -333,7 +336,7 @@ async function clearCloudData() {
   }
   try {
     // 使用DELETE方法清空数据
-    const resp = await fetchWithTimeout(url, { method: 'DELETE' }, 10000);
+    const resp = await fetchWithTimeout(url, { method: 'DELETE' }, 20000);
     if (resp.ok || resp.status === 200) {
       showToast('✅ 云端数据已清空', 'success', 3000);
       console.log('[Cloud] 云端数据已清空');
@@ -353,7 +356,7 @@ function startCloudPolling() {
     const url = getCloudUrl('sales_crm_db');
     if (!url) return;
     try {
-      const resp = await fetchWithTimeout(url, { method: 'GET' }, 5000);
+      const resp = await fetchWithTimeout(url, { method: 'GET' }, 20000);
       if (!resp.ok) return;
       const text = await resp.text();
       if (!text || text === 'null' || text.trim() === '') return;
