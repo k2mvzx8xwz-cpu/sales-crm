@@ -921,6 +921,7 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
 @media (max-width: 768px) {
   /* 隐藏桌面端侧边栏主题切换，显示底部导航 */
   .sidebar .sidebar-bottom { display: none !important; }
+  .mobile-bottom-nav { display: flex !important; }
 
   /* 主内容区：去掉侧边栏宽度偏移，底部留出导航栏空间 */
   .main-content {
@@ -1069,8 +1070,11 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
 
 /* ==================== 超小屏幕（< 400px）==================== */
 @media (max-width: 400px) {
-  .stats-grid { grid-template-columns: 1fr; }
-  .stat-card { flex-direction: column; align-items: flex-start; }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { padding: 10px 8px; gap: 8px; border-radius: 10px; }
+  .stat-icon { width: 28px; height: 28px; font-size: 14px; }
+  .stat-value { font-size: 15px; }
+  .stat-label { font-size: 10px; }
   .mobile-header { padding: 0 12px; }
   .main-content { padding: 10px 10px 70px; }
 }
