@@ -343,14 +343,16 @@ function getEmptyDB() {
 }
 
 // ==================== 预设商品 ====================
+// 产品名称保持简洁，描述信息放在"备注"字段（订单管理中可查看）
+// 用户可自行在商品管理中增删改，此处仅作初始示例
 const DEFAULT_PRODUCTS = [
-  { name: '路通月卡(打卡，安卓系统使用，一机一码，操作需要规范)', type: 'software', price: 80, cost: 7 },
-  { name: '路通半年(打卡，安卓系统使用，一机一码，操作需要规范)', type: 'software', price: 150, cost: 38 },
-  { name: '路通年卡(打卡，安卓系统使用，一机一码，操作需要规范)', type: 'software', price: 268, cost: 89 },
-  { name: '蓝牙打卡(只限手机连接考勤机蓝牙打卡使用，顺丰包邮)', type: 'hardware', price: 288, cost: 100 },
-  { name: 'iphone15以上C口(全局修改定位，不绑定手机，永久使用，安全稳定，顺丰包邮)', type: 'hardware', price: 288, cost: 110 },
-  { name: 'iphone14以下L口(全局修改定位，不绑定手机，永久使用，安全稳定，顺丰包邮)', type: 'hardware', price: 288, cost: 150 },
-  { name: 'iphone全系列CL双口(全局修改定位，不绑定手机，永久使用，安全稳定，顺丰包邮)', type: 'hardware', price: 388, cost: 200 }
+  { name: '路通月卡', type: 'software', price: 80, cost: 7, note: '打卡使用，安卓系统，一机一码' },
+  { name: '路通半年卡', type: 'software', price: 150, cost: 38, note: '打卡使用，安卓系统，一机一码' },
+  { name: '路通年卡', type: 'software', price: 268, cost: 89, note: '打卡使用，安卓系统，一机一码' },
+  { name: '蓝牙打卡器', type: 'hardware', price: 288, cost: 100, note: '连接考勤机蓝牙打卡，顺丰包邮' },
+  { name: 'iPhone15以上C口定位器', type: 'hardware', price: 288, cost: 110, note: '全局修改定位，不绑定手机，永久使用，顺丰包邮' },
+  { name: 'iPhone14以下L口定位器', type: 'hardware', price: 288, cost: 150, note: '全局修改定位，不绑定手机，永久使用，顺丰包邮' },
+  { name: 'iPhone全系列CL双口定位器', type: 'hardware', price: 388, cost: 200, note: '全局修改定位，不绑定手机，永久使用，顺丰包邮' }
 ];
 
 // ==================== 本地数据读写（不触发云同步）====================
