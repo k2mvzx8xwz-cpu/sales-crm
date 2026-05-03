@@ -3,7 +3,7 @@
  * 职责：数据存储（Firebase云同步+localStorage本地备份）、工具函数、全局状态、初始化
  * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
-// 版本标记：20260503-1500（SSE实时云同步 + 手机端导航补全）
+// 版本标记：20260503-1715（云同步改为5秒轮询+手机端统计卡片2列横排修复）
 console.log('[核心工具.js] 已加载，版本: 20260502-1430');
 
 // ==================== 全局数据存储层（统一存储，兼容云端同步）====================
@@ -168,67 +168,36 @@ function applyCloudData(cloudData) {
   console.log('[Cloud] 已应用云端数据');
 }
 
-// ==================== SSE 实时监听（真正实时）====================
-function startSSEListener() {
-  if (window.APP_CLOUD_SSE_SOURCE) return; // 防止重复
-  const sseUrl = getSSEUrl();
-  if (!sseUrl) return;
-
-  try {
-    const es = new EventSource(sseUrl);
-    window.APP_CLOUD_SSE_SOURCE = es;
-
-    es.onopen = function() {
-      console.log('[Cloud] ✅ SSE 实时监听已连接');
-      var statusEl = document.getElementById('sync-status');
-      if (statusEl) statusEl.textContent = '☁️ 实时同步中';
-    };
-
-    es.addEventListener('put', function(e) {
-      try {
-        const data = JSON.parse(e.data);
-        console.log('[Cloud] SSE 收到数据更新');
-        // 如果是自己刚保存的（1秒内），跳过
-        if (Date.now() - window.APP_CLOUD_LAST_SAVE_TIME < 2000) return;
-        if (data.path === '/' && data.data) {
-          applyCloudData(data.data);
-          showToast('📱 其他设备数据已同步', 'info', 2000);
-        }
-      } catch(err) { console.warn('[Cloud] SSE put 解析失败', err); }
-    });
-
-    es.onerror = function(err) {
-      console.warn('[Cloud] SSE 连接断开，降级为轮询模式', err);
-      es.close();
-      window.APP_CLOUD_SSE_SOURCE = null;
-      startCloudPolling(); // 降级为轮询
-    };
-
-    console.log('[Cloud] SSE 实时监听已启动');
-  } catch (e) {
-    console.warn('[Cloud] SSE 启动失败，降级为轮询模式', e);
-    startCloudPolling();
-  }
-}
-
-// ==================== 轮询降级方案 ====================
+// ==================== 实时云同步（Firebase Realtime Database 轮询）====================
+// Firebase Realtime Database REST API 不支持 SSE，改为每 5 秒轮询检测变化
 function startCloudPolling() {
   if (window.APP_CLOUD_POLLING_TIMER) return;
-  console.log('[Cloud] 轮询模式已启动（每5秒）');
-  window.APP_CLOUD_POLLING_TIMER = setInterval(async function() {
-    if (!window.APP_FIREBASE_INITIALIZED) return;
-    if (Date.now() - window.APP_CLOUD_LAST_SAVE_TIME < 3000) return; // 自己刚保存，跳过
+  console.log('[Cloud] 云同步轮询已启动（每5秒）');
+
+  // 首次延迟 3 秒后立即同步一次（页面加载完立即拉取）
+  setTimeout(function() { pollCloudOnce(); }, 3000);
+
+  window.APP_CLOUD_POLLING_TIMER = setInterval(pollCloudOnce, 5000);
+}
+
+async function pollCloudOnce() {
+  if (!window.APP_FIREBASE_INITIALIZED || !window.APP.db) return;
+  // 自己刚保存的，跳过（避免回读自己刚写入的数据）
+  if (Date.now() - window.APP_CLOUD_LAST_SAVE_TIME < 3000) return;
+  try {
     const cloudData = await loadFromCloud();
-    if (cloudData) {
-      // 简单比较：序列化成字符串对比
-      const localStr = JSON.stringify(window.APP.db);
-      const cloudStr = JSON.stringify(cloudData);
-      if (localStr !== cloudStr) {
-        applyCloudData(cloudData);
-        showToast('📱 其他设备数据已同步', 'info', 2000);
-      }
+    if (!cloudData) return;
+    // 用 JSON.stringify 对比（属性顺序一致时有效）
+    const localStr = JSON.stringify(window.APP.db);
+    const cloudStr = JSON.stringify(cloudData);
+    if (localStr !== cloudStr) {
+      console.log('[Cloud] 检测到云端数据变化，正在同步...');
+      applyCloudData(cloudData);
+      showToast('📱 云端数据已同步', 'info', 2000);
     }
-  }, 5000);
+  } catch(e) {
+    // 静默失败，不打断用户
+  }
 }
 
 function stopCloudPolling() {
@@ -361,20 +330,18 @@ function stopCloudPolling() {
   }
 }
 
-// 启动云端监听（优先 SSE 实时，降级为轮询）
+// 启动云端监听（轮询 + 页面可见立即同步）
 function listenCloudChanges(callback) {
   if (!window.APP_FIREBASE_INITIALIZED) return;
 
-  // 优先启动 SSE 实时监听
-  startSSEListener();
+  // 启动 5 秒轮询
+  startCloudPolling();
 
   // 页面从后台恢复时立即同步一次
   document.addEventListener('visibilitychange', function() {
     if (!document.hidden && window.APP_FIREBASE_INITIALIZED) {
       console.log('[Cloud] 页面恢复可见，立即检查云端数据');
-      loadFromCloud().then(function(data) {
-        if (data) applyCloudData(data);
-      }).catch(function() {});
+      pollCloudOnce();
     }
   });
 
