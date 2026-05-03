@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>销售客户管理系统</title>
-  <link rel="stylesheet" href="style.css?v=202605031715">
+  <link rel="stylesheet" href="style.css?v=202605031730">
 </head>
 <body>
 <div class="app-layout">
@@ -66,10 +66,17 @@
       <span class="nav-icon">⚙️</span> 系统设置
     </div>
 
-    <!-- 快捷主题切换（桌面端） -->
+    <!-- 快捷功能（桌面端） -->
     <div class="sidebar-bottom">
+      <button onclick="syncNow()" title="同步云端数据" class="sidebar-sync-btn" style="background:var(--bg-hover);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:14px;display:flex;align-items:center;gap:6px;width:100%;justify-content:center;">
+        <svg id="sidebar-sync-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span id="sidebar-sync-text">同步数据</span>
+      </button>
       <button onclick="cycleTheme()" title="切换主题" style="background:var(--bg-hover);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;" id="theme-toggle-icon-dt">🌙</button>
-      <span style="color:var(--text-muted);font-size:12px;align-self:center;">切换主题</span>
     </div>
   </aside>
 
@@ -111,22 +118,41 @@
     <span class="mobile-nav-icon">📊</span>
     <span>统计</span>
   </div>
+  <!-- 同步按钮作为设置页面入口 -->
   <div class="mobile-nav-item" data-page="settings" onclick="navigateTo('settings')">
     <span class="mobile-nav-icon">⚙️</span>
     <span>设置</span>
   </div>
 </nav>
 
+<!-- 手机端悬浮同步按钮 -->
+<button onclick="syncNow()" title="立即同步" class="mobile-sync-btn" id="mobile-sync-btn" style="display:none;position:fixed;bottom:80px;right:16px;width:48px;height:48px;border-radius:50%;background:var(--primary,#3b82f6);color:#fff;border:none;box-shadow:0 4px 12px rgba(59,130,246,0.4);z-index:9999;cursor:pointer;align-items:center;justify-content:center;">
+  <svg id="sync-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 4 23 10 17 10"></polyline>
+    <polyline points="1 20 1 14 7 14"></polyline>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  </svg>
+</button>
+
+<style>
+/* 手机端显示悬浮同步按钮 */
+@media (max-width: 768px) {
+  .mobile-sync-btn {
+    display: flex !important;
+  }
+}
+</style>
+
 <!-- JS模块加载（顺序很重要） -->
-<script src="核心工具.js?v=202605031715"></script>
-<script src="工作台.js?v=202605031715"></script>
-<script src="客户管理.js?v=202605031715"></script>
-<script src="订单管理.js?v=202605031715"></script>
-<script src="卡密库.js?v=202605031715"></script>
-<script src="商品管理.js?v=202605031715"></script>
-<script src="数据统计.js?v=202605031715"></script>
-<script src="系统设置.js?v=202605031715"></script>
-<script src="扩展功能.js?v=202605031715"></script>
+<script src="核心工具.js?v=202605031730"></script>
+<script src="工作台.js?v=202605031730"></script>
+<script src="客户管理.js?v=202605031730"></script>
+<script src="订单管理.js?v=202605031730"></script>
+<script src="卡密库.js?v=202605031730"></script>
+<script src="商品管理.js?v=202605031730"></script>
+<script src="数据统计.js?v=202605031730"></script>
+<script src="系统设置.js?v=202605031730"></script>
+<script src="扩展功能.js?v=202605031730"></script>
 
 <script>
 // 移动端菜单控制

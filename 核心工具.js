@@ -3,7 +3,7 @@
  * 职责：数据存储（Firebase云同步+localStorage本地备份）、工具函数、全局状态、初始化
  * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
-// 版本标记：20260503-1715（云同步改为5秒轮询+手机端统计卡片2列横排修复）
+// 版本标记：20260503-1730（修复：添加强制同步按钮、清空云端数据功能）
 console.log('[核心工具.js] 已加载，版本: 20260502-1430');
 
 // ==================== 全局数据存储层（统一存储，兼容云端同步）====================
@@ -212,19 +212,18 @@ function stopCloudPolling() {
 }
 
 // 手动同步按钮：从云端拉取最新数据并应用（用户主动触发）
+window._syncInProgress = false;
 async function syncNow() {
-  const btn = document.getElementById('mobile-sync-btn');
   const icon = document.getElementById('sync-icon');
-  const sidebarBtn = document.getElementById('sidebar-sync-btn');
   const sidebarIcon = document.getElementById('sidebar-sync-icon');
   const sidebarText = document.getElementById('sidebar-sync-text');
   
   // 防止重复点击
-  if (window._SYNC_IN_PROGRESS) {
+  if (window._syncInProgress) {
     showToast('同步进行中，请稍候...', 'warning');
     return;
   }
-  window._SYNC_IN_PROGRESS = true;
+  window._syncInProgress = true;
   
   try {
     // 显示加载状态（旋转动画）
@@ -234,20 +233,20 @@ async function syncNow() {
     
     // 检查 Firebase 是否初始化
     if (!window.APP_FIREBASE_INITIALIZED) {
-      // 尝试初始化
+      // 尝试从 settings 中获取配置并初始化
       const s = window.APP.db && window.APP.db.settings;
       if (s && s.firebaseConfig && s.firebaseConfig.apiKey) {
         window.APP_FIREBASE_CONFIG = s.firebaseConfig;
-        await initFirebase();
+        initFirebase();
       }
     }
     
     if (!window.APP_FIREBASE_INITIALIZED) {
-      showToast('⚠️ 请先在「系统设置」中配置云端同步', 'warning');
+      showToast('⚠️ 请先在系统设置中配置并启用云端同步', 'warning', 3000);
       return;
     }
     
-    console.log('[Sync] 开始手动同步...');
+    console.log('[Sync] 开始同步...');
     const cloudData = await loadFromCloud();
     
     if (cloudData) {
@@ -267,26 +266,71 @@ async function syncNow() {
         cards: typeof renderCards === 'function' ? renderCards : null,
         products: typeof renderProducts === 'function' ? renderProducts : null,
         stats: typeof renderStats === 'function' ? renderStats : null,
+        settings: typeof renderSettings === 'function' ? renderSettings : null,
       };
       if (renderMap[currentPage]) renderMap[currentPage]();
       
-      showToast('✅ 同步成功！客户：' + oldCount + ' → ' + newCount, 'success', 3000);
+      showToast('✅ 同步成功！已从云端拉取 ' + newCount + ' 条客户数据', 'success', 3000);
       console.log('[Sync] 同步成功：本地 ' + oldCount + ' 条 → 云端 ' + newCount + ' 条');
     } else {
       // 云端无数据：把本地数据推送到云端
-      await saveToCloud(window.APP.db);
-      showToast('✅ 本地数据已推送到云端', 'success', 3000);
-      console.log('[Sync] 本地数据已推送到云端');
+      const ok = await saveToCloud(window.APP.db);
+      if (ok) {
+        showToast('✅ 本地数据已推送至云端', 'success', 3000);
+        console.log('[Sync] 本地数据已推送到云端');
+      } else {
+        showToast('⚠️ 云端推送失败，请检查网络', 'warning', 3000);
+      }
     }
   } catch (e) {
     console.error('[Sync] 同步失败：', e);
     showToast('❌ 同步失败：' + e.message, 'error', 4000);
   } finally {
     // 恢复按钮状态
-    window._SYNC_IN_PROGRESS = false;
+    window._syncInProgress = false;
     if (icon) icon.style.animation = '';
     if (sidebarIcon) sidebarIcon.style.animation = '';
     if (sidebarText) sidebarText.textContent = '同步数据';
+  }
+}
+
+// 推送本地数据到云端（不清除本地）
+async function pushLocalToCloud() {
+  if (!window.APP_FIREBASE_INITIALIZED) {
+    const s = window.APP.db && window.APP.db.settings;
+    if (s && s.firebaseConfig && s.firebaseConfig.apiKey) {
+      window.APP_FIREBASE_CONFIG = s.firebaseConfig;
+      initFirebase();
+    }
+  }
+  if (!window.APP_FIREBASE_INITIALIZED) {
+    showToast('⚠️ 云同步未启用', 'warning');
+    return false;
+  }
+  return await saveToCloud(window.APP.db);
+}
+
+// 清空云端数据（危险操作）
+async function clearCloudData() {
+  if (!confirm('确定要清空所有云端数据吗？此操作不可恢复！')) return;
+  if (!confirm('再次确认：清空后云端所有客户、订单、卡密数据将被删除！')) return;
+  
+  const url = getCloudUrl('sales_crm_db');
+  if (!url) {
+    showToast('❌ 云端URL无效', 'error');
+    return;
+  }
+  try {
+    // 使用DELETE方法清空数据
+    const resp = await fetchWithTimeout(url, { method: 'DELETE' }, 10000);
+    if (resp.ok || resp.status === 200) {
+      showToast('✅ 云端数据已清空', 'success', 3000);
+      console.log('[Cloud] 云端数据已清空');
+    } else {
+      showToast('⚠️ 清空失败：' + resp.status, 'error');
+    }
+  } catch (e) {
+    showToast('❌ 清空失败：' + e.message, 'error');
   }
 }
 

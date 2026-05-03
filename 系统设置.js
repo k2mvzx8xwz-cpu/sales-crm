@@ -59,6 +59,10 @@ function renderSettings() {
           <button class="btn-warning" onclick="manualSyncNow()">🔄 立即同步</button>
           <button class="btn-danger" onclick="clearFirebaseConfig()">🗑 清除配置</button>
         </div>
+        <div style="margin-top:10px;">
+          <button class="btn-danger" onclick="clearCloudData()" style="font-size:12px;padding:6px 12px;">⚠️ 清空云端数据</button>
+          <span style="color:var(--text-muted);font-size:11px;margin-left:8px;">谨慎操作：清空后所有设备数据都将被删除</span>
+        </div>
         <div id="firebase-test-result" style="margin-top:10px;font-size:13px;"></div>
       </div>
     </div>
@@ -512,12 +516,12 @@ function applyRestoredConfig(data) {
     window.APP.db.settings.firebaseConfig = config;
     saveDB();
     window.APP_FIREBASE_CONFIG = config;
-    initFirebase().then(success => {
-      if (success) {
-        showToast('配置已恢复，正在同步云端数据...', 'success');
-        setTimeout(() => manualSyncNow(), 1000);
-      } else {
-        showToast('配置已保存，但Firebase初始化失败', 'warning');
+    const success = initFirebase();
+    if (success) {
+      showToast('配置已恢复，正在同步云端数据...', 'success');
+      setTimeout(() => manualSyncNow(), 1000);
+    } else {
+      showToast('配置已保存，但Firebase初始化失败', 'warning');
       }
     });
   }, '恢复配置');
@@ -784,19 +788,13 @@ async function saveFirebaseConfig() {
   if (statusEl) statusEl.textContent = '☁️ 已连接';
 }
 
-// 手动立即同步按钮
+// 手动立即同步按钮 - 调用全局 syncNow
 async function manualSyncNow() {
-  if (!window.APP_FIREBASE_INITIALIZED) {
-    showToast('请先保存 Firebase 配置并启用云同步', 'error');
-    return;
-  }
-  showToast('正在同步到云端…', 'info', 2000);
-  var ok = await flushCloudSync();
-  if (ok) {
-    window.APP_CLOUD_LAST_HASH = JSON.stringify(window.APP.db);
-    showToast('云端同步完成', 'success');
+  // 直接调用全局的 syncNow 函数（已在核心工具.js中定义）
+  if (typeof syncNow === 'function') {
+    await syncNow();
   } else {
-    showToast('云端同步失败，请检查网络', 'error');
+    showToast('同步功能加载中，请稍后重试', 'warning', 3000);
   }
 }
 
