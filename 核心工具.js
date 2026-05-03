@@ -839,7 +839,22 @@ function navigateTo(page) {
     settings: typeof renderSettings === 'function' ? renderSettings : null
   };
   const fn = renderMap[page];
-  if (fn) fn();
+  const el = document.getElementById('page-' + page);
+  if (!fn) {
+    console.error('[navigateTo] ' + page + ' 的渲染函数未定义（JS文件可能加载失败）');
+    if (el) {
+      el.innerHTML = '<div style="padding:40px;color:#ef4444;">⚠️ ' + page + ' 页面加载失败：渲染函数未定义<br><small style="color:#94a3b8">可能原因：JS文件语法错误，请按F12控制台查看报错</small></div>';
+    }
+    return;
+  }
+  try {
+    fn();
+  } catch(e) {
+    console.error('[navigateTo] ' + page + ' 渲染失败：', e);
+    if (el) {
+      el.innerHTML = '<div style="padding:40px;color:#ef4444;">⚠️ ' + page + ' 页面渲染失败：' + e.message + '<br><small style="color:#94a3b8">请按F12打开控制台查看详细错误</small></div>';
+    }
+  }
 }
 
 // ==================== 初始化入口（优化：本地数据优先显示，云端后台同步）====================
