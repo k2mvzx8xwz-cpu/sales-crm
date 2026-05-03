@@ -1,5 +1,5 @@
 /**
- * 系统设置.js - 销售客户管理系统 v3.0.0
+ * 系统设置.js - 销售客户管理系统 v4.0.0
  * 职责：系统设置、模板配置、数据导入导出
  */
 
@@ -33,6 +33,74 @@ function renderSettings() {
         <div class="form-hint" style="margin-top:8px">
           跟随系统时，会自动匹配您设备的深色/浅色显示方案。
         </div>
+      </div>
+    </div>
+
+    <!-- 云端数据同步 -->
+    <div class="section-card">
+      <div class="section-card-header"><span>☁️ 云端数据同步（PC与手机数据同步）</span><span id="sync-status" style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:8px"></span></div>
+      <div style="padding:16px">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;">
+            <p style="margin-bottom:8px"><strong style="color:var(--text-primary)">开启云端同步后</strong>，您的客户、订单、卡密等数据将在所有设备间自动同步。</p>
+            <p>PC端新增数据 → 手机立即可见<br>手机新增数据 → PC刷新即可见</p>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Firebase Realtime Database 配置</label>
+          <textarea class="form-textarea" id="s-firebase-config" rows="4" placeholder="粘贴 Firebase 项目配置 JSON（格式见下方说明）" style="font-size:12px;resize:vertical;min-height:90px;">${s.firebaseConfig ? JSON.stringify(s.firebaseConfig, null, 2) : ''}</textarea>
+          <div class="form-hint" style="margin-top:6px">
+            Firebase 是免费的实时数据库服务，开启云同步前需要配置。配置步骤：
+            <a href="https://console.firebase.google.com/" target="_blank" class="link" style="font-size:12px">1. 打开 Firebase Console → 新建项目 → Realtime Database → 创建数据库（选测试模式）→ 获取 Web 配置</a>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="saveFirebaseConfig()">💾 保存并启用云同步</button>
+          <button class="btn-warning" onclick="manualSyncNow()">🔄 立即同步</button>
+          <button class="btn-danger" onclick="clearFirebaseConfig()">🗑 清除配置</button>
+        </div>
+        <div id="firebase-test-result" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+    </div>
+
+    <!-- 数据导入导出（跨设备同步，无需注册账号）-->
+    <div class="section-card">
+      <div class="section-card-header"><span>💾 数据导入导出（跨设备手动同步）</span></div>
+      <div style="padding:16px">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+          <strong style="color:var(--text-primary)">使用步骤：</strong><br>
+          ① 在设备A点「<strong>导出数据</strong>」→ 复制生成的JSON内容<br>
+          ② 在设备B打开系统 → 点「<strong>导入数据</strong>」→ 粘贴JSON → 确认导入<br>
+          <strong style="color:var(--accent)">提示：</strong>导入会覆盖本机当前数据，建议导入前先导出备份。
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">JSON 数据（导入时粘贴至此）</label>
+          <textarea class="form-textarea" id="s-import-data" rows="6" placeholder="从其他设备复制 JSON 数据，粘贴于此，然后点「导入数据」" style="font-size:12px;resize:vertical;min-height:120px;font-family:monospace;"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="exportAllData()">📤 导出全部数据</button>
+          <button class="btn-warning" onclick="importAllData()">📥 导入全部数据</button>
+          <button class="btn-secondary" onclick="exportAllDataToFile()">📁 下载为文件</button>
+        </div>
+        <div id="import-result" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+    </div>
+
+    <!-- 配置备份与恢复 -->
+    <div class="section-card">
+      <div class="section-card-header"><span>🔐 配置备份与恢复（防止数据丢失）</span></div>
+      <div style="padding:16px">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+          <strong style="color:var(--text-primary)">为什么需要备份配置？</strong><br>
+          清除浏览器数据时，Firebase配置会丢失，导致无法连接云端恢复数据。<br>
+          请定期备份配置，清除数据后可通过"恢复配置"快速重新连接云端。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="backupConfig()">📦 备份配置</button>
+          <button class="btn-warning" onclick="restoreConfig()">📂 恢复配置</button>
+          <button class="btn-secondary" onclick="downloadConfigFile()">💾 下载配置文件</button>
+        </div>
+        <div id="config-backup-result" style="margin-top:10px;font-size:13px;"></div>
       </div>
     </div>
 
@@ -369,7 +437,93 @@ function exportData() {
   showToast('数据已导出');
 }
 
-// 数据导入
+// ==================== 配置备份与恢复 ====================
+function backupConfig() {
+  const db = window.APP.db;
+  const config = db.settings && db.settings.firebaseConfig;
+  if (!config || !config.apiKey) {
+    showToast('请先配置Firebase', 'warning');
+    return;
+  }
+  const json = JSON.stringify({ firebaseConfig: config }, null, 2);
+  const importEl = document.getElementById('s-import-data');
+  if (importEl) importEl.value = json;
+  showToast('配置已写入导入框，请复制保存！', 'success', 3000);
+}
+
+function downloadConfigFile() {
+  const db = window.APP.db;
+  const config = db.settings && db.settings.firebaseConfig;
+  if (!config || !config.apiKey) {
+    showToast('请先配置Firebase', 'warning');
+    return;
+  }
+  const json = JSON.stringify({ firebaseConfig: config }, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `firebase-config-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('配置文件已下载，请妥善保存！', 'success');
+}
+
+function restoreConfig() {
+  const jsonStr = document.getElementById('s-import-data')?.value?.trim();
+  if (!jsonStr) {
+    // 尝试从文件输入恢复
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json,.txt,application/json';
+    fileInput.onchange = function() {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          applyRestoredConfig(data);
+        } catch(err) {
+          showToast('文件解析失败', 'error');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    };
+    fileInput.click();
+    return;
+  }
+  try {
+    const data = JSON.parse(jsonStr);
+    applyRestoredConfig(data);
+  } catch(e) {
+    showToast('JSON格式错误，请检查', 'error');
+  }
+}
+
+function applyRestoredConfig(data) {
+  const config = data.firebaseConfig;
+  if (!config || !config.apiKey) {
+    showToast('配置格式不正确，缺少apiKey', 'error');
+    return;
+  }
+  confirmDialog('确定恢复Firebase配置吗？当前配置将被覆盖。', () => {
+    if (!window.APP.db.settings) window.APP.db.settings = {};
+    window.APP.db.settings.firebaseConfig = config;
+    saveDB();
+    window.APP_FIREBASE_CONFIG = config;
+    initFirebase().then(success => {
+      if (success) {
+        showToast('配置已恢复，正在同步云端数据...', 'success');
+        setTimeout(() => manualSyncNow(), 1000);
+      } else {
+        showToast('配置已保存，但Firebase初始化失败', 'warning');
+      }
+    });
+  }, '恢复配置');
+}
+
+// ==================== 数据导入（修改版，支持配置恢复） ====================
 function importData(input) {
   const file = input.files[0];
   if (!file) return;
@@ -394,17 +548,17 @@ function importData(input) {
 
 // 清空全部数据
 function clearAllData() {
-  if (!confirm('⚠️ 此操作将清空所有客户、订单、商品、卡密、购卡记录数据！\n此操作不可恢复！\n确定继续吗？')) return;
-  if (!confirm('❌ 再次确认：所有业务数据将被清空（商品管理和设置保留）')) return;
-  const db = window.APP.db;
-  const settings = db.settings;
-  const productDisplayData = db.productDisplayData;
-  window.APP.db = getEmptyDB();
-  window.APP.db.settings = settings;
-  window.APP.db.productDisplayData = productDisplayData;
-  saveDB();
-  alert('✅ 数据已全部清空，刷新页面后生效');
-  location.reload();
+  confirmDialog('⚠️ 此操作将清空所有客户、订单、卡密、购卡记录数据！\n此操作不可恢复！\n\n确定继续吗？', function() {
+    const db = window.APP.db;
+    const settings = db.settings;
+    const productDisplayData = db.productDisplayData;
+    window.APP.db = getEmptyDB();
+    window.APP.db.settings = settings;
+    window.APP.db.productDisplayData = productDisplayData;
+    saveDB();
+    showToast('✅ 数据已全部清空，即将刷新页面', 'success');
+    setTimeout(function(){ location.reload(); }, 1500);
+  }, '确认清空全部数据');
 }
 
 // 数据清理 - 获取真实条数（直接读 localStorage，兼容系统实际存储结构）
@@ -472,49 +626,48 @@ function updateClearBtn() {
 // 执行清除（直接操作 localStorage['销售管理数据库']，与系统实际存储完全一致）
 function clearSelectedData() {
   var boxes = document.querySelectorAll('.clear-box:checked');
-  if (!boxes.length) { alert('请先勾选要清除的数据项'); return; }
+  if (!boxes.length) { showToast('请先勾选要清除的数据项', 'warning'); return; }
   var keys = [];
   for (var i = 0; i < boxes.length; i++) { keys.push(boxes[i].value); }
   var labelMap = { customers:'客户管理', sw_orders:'软件订单', hw_orders:'硬件订单', cards:'卡密库', cardRecords:'购卡记录', products:'商品管理', sw_template:'软件订单模板', hw_template:'硬件订单模板' };
   var labels = keys.map(function(k){ return labelMap[k] || k; });
 
-  if (!confirm('\u26a0\ufe0f 确定清除以下数据？（此操作不可恢复）\n\n' + labels.join('、') + '\n\n点击确定继续。')) return;
-  if (!confirm('\u274c 再次确认：' + labels.join('、') + ' 将被清空！')) return;
+  confirmDialog('⚠️ 确定清除以下数据？（此操作不可恢复）\n\n' + labels.join('、') + '\n\n点击确定继续。', function() {
+    try {
+      var raw = localStorage.getItem('销售管理数据库');
+      if (!raw) { showToast('数据存储异常，无法清除', 'error'); return; }
+      var db = JSON.parse(raw);
 
-  try {
-    var raw = localStorage.getItem('销售管理数据库');
-    if (!raw) { alert('数据存储异常，无法清除'); return; }
-    var db = JSON.parse(raw);
-
-    for (var k = 0; k < keys.length; k++) {
-      var key = keys[k];
-      if (key === 'sw_orders') {
-        db.orders = (db.orders || []).filter(function(o){ return o.type !== 'software'; });
-      } else if (key === 'hw_orders') {
-        db.orders = (db.orders || []).filter(function(o){ return o.type !== 'hardware'; });
-      } else if (key === 'sw_template') {
-        db.settings = db.settings || {};
-        db.settings.softwareCopyTemplate = '';
-      } else if (key === 'hw_template') {
-        db.settings = db.settings || {};
-        db.settings.hardwareCopyTemplate = '';
-      } else if (Array.isArray(db[key])) {
-        db[key] = [];
-      } else if (typeof db[key] === 'object' && db[key] !== null) {
-        db[key] = {};
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        if (key === 'sw_orders') {
+          db.orders = (db.orders || []).filter(function(o){ return o.type !== 'software'; });
+        } else if (key === 'hw_orders') {
+          db.orders = (db.orders || []).filter(function(o){ return o.type !== 'hardware'; });
+        } else if (key === 'sw_template') {
+          db.settings = db.settings || {};
+          db.settings.softwareCopyTemplate = '';
+        } else if (key === 'hw_template') {
+          db.settings = db.settings || {};
+          db.settings.hardwareCopyTemplate = '';
+        } else if (Array.isArray(db[key])) {
+          db[key] = [];
+        } else if (typeof db[key] === 'object' && db[key] !== null) {
+          db[key] = {};
+        }
       }
+
+      // 直接写入 localStorage
+      localStorage.setItem('销售管理数据库', JSON.stringify(db));
+      // 同时更新内存中的 window.APP.db（保持一致性）
+      if (window.APP && window.APP.db) window.APP.db = db;
+
+      showToast('✅ 已清除 ' + labels.length + ' 项数据', 'success');
+      initClearDataList();
+    } catch(e) {
+      showToast('清除失败：' + e.message, 'error');
     }
-
-    // 直接写入 localStorage
-    localStorage.setItem('销售管理数据库', JSON.stringify(db));
-    // 同时更新内存中的 window.APP.db（保持一致性）
-    if (window.APP && window.APP.db) window.APP.db = db;
-
-    alert('\u2705 已清除 ' + labels.length + ' 项数据，刷新页面后生效');
-    initClearDataList();
-  } catch(e) {
-    alert('清除失败：' + e.message);
-  }
+  }, '确认清除');
 }
 
 // 每次 renderSettings 后自动初始化清理列表
@@ -524,3 +677,205 @@ renderSettings = function() {
   var container = document.getElementById('clear-data-list');
   if (container) setTimeout(initClearDataList, 50);
 };
+
+// ==================== Firebase REST API 云同步配置 ====================
+async function saveFirebaseConfig() {
+  var raw = document.getElementById('s-firebase-config')?.value?.trim();
+  var resultEl = document.getElementById('firebase-test-result');
+  if (!raw) { resultEl.innerHTML = '<span style="color:#ef4444">请先粘贴 Firebase 配置</span>'; return; }
+
+  var config;
+  try {
+    // 优先当作纯 JSON 解析
+    config = JSON.parse(raw);
+  } catch (e) {
+    // 如果纯 JSON 失败，尝试从完整 JS 代码中提取 firebaseConfig 对象
+    var match = raw.match(/firebaseConfig\s*=\s*(\{[\s\S]*?\})\s*;/);
+    if (!match) {
+      // 尝试提取 const firebaseConfig = {...} 格式
+      match = raw.match(/const\s+firebaseConfig\s*=\s*(\{[\s\S]*?\})\s*;/);
+    }
+    if (!match) {
+      // 尝试直接提取 {...} 第一个完整对象
+      var braceStart = raw.indexOf('{');
+      var braceEnd = raw.lastIndexOf('}');
+      if (braceStart >= 0 && braceEnd > braceStart) {
+        try {
+          config = JSON.parse(raw.substring(braceStart, braceEnd + 1));
+        } catch (e2) {
+          resultEl.innerHTML = '<span style="color:#ef4444">无法识别配置格式，请粘贴 Firebase 给的完整代码或纯 JSON</span>';
+          return;
+        }
+      } else {
+        resultEl.innerHTML = '<span style="color:#ef4444">无法识别配置格式，请粘贴 Firebase 给的完整代码或纯 JSON</span>';
+        return;
+      }
+    } else {
+      try {
+        // 把 JS 对象字面量转成 JSON（去掉末尾逗号等）
+        var objStr = match[1].replace(/,(\s*[}\]])/g, '$1');
+        config = JSON.parse(objStr);
+      } catch (e2) {
+        resultEl.innerHTML = '<span style="color:#ef4444">JSON 解析失败：' + e2.message + '</span>';
+        return;
+      }
+    }
+  }
+  if (!config.apiKey || !config.databaseURL) {
+    resultEl.innerHTML = '<span style="color:#ef4444">配置缺少 apiKey 或 databaseURL 字段</span>';
+    return;
+  }
+  // 保存配置到本地数据
+  var db = window.APP.db;
+  db.settings.firebaseConfig = config;
+  saveDB();
+  resultEl.innerHTML = '<span style="color:#94a3b8">正在测试 Firebase 连接（8秒超时）…</span>';
+  
+  var success = initFirebase();
+  if (!success) {
+    resultEl.innerHTML = '<span style="color:#ef4444">❌ 缺少 databaseURL，请检查配置是否完整。</span>';
+    return;
+  }
+  
+  // 先测试连接（读取云端），而不是直接写入
+  var cloudData;
+  try {
+    cloudData = await Promise.race([
+      loadFromCloud(true),   // true = 失败立即抛异常
+      new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时（超过8秒），请检查网络或数据库URL是否正确')), 8000))
+    ]);
+    // 连接成功
+    resultEl.innerHTML = '<span style="color:#10b981">✅ Firebase 连接成功！</span>';
+  } catch (e) {
+    resultEl.innerHTML = '<span style="color:#ef4444">❌ 连接失败：' + e.message + '<br><small>请检查：① 配置是否正确 ② 数据库规则是否允许读写 ③ 网络能否访问 Firebase</small></span>';
+    showToast('Firebase 连接失败', 'error', 4000);
+    var statusEl2 = document.getElementById('sync-status');
+    if (statusEl2) statusEl2.textContent = '⚠️ 连接失败';
+    return;
+  }
+  
+  // 连接成功，询问用户如何处理云端数据
+  if (cloudData) {
+    // 云端有数据，询问是否覆盖本地
+    confirmDialog('云端已有数据，是否用云端数据覆盖本地数据？<br><small style="color:#94a3b8">取消则保留本地数据，并将本地数据同步到云端</small>', () => {
+      // 用云端数据覆盖本地
+      window.APP.db = cloudData;
+      saveDB_localOnly();
+      showToast('已从云端恢复数据', 'success', 3000);
+      renderDashboard();
+      resultEl.innerHTML = '<span style="color:#10b981">✅ 已从云端恢复数据！</span>';
+    }, '云端数据冲突');
+    // 如果用户取消，则保留本地数据，继续下面的同步逻辑
+  }
+  
+  // 启动轮询监听
+  startCloudPolling();
+  window.APP_CLOUD_LAST_HASH = JSON.stringify(window.APP.db);
+  
+  // 将当前数据同步到云端
+  var syncOk = await flushCloudSync();
+  if (syncOk) {
+    resultEl.innerHTML = '<span style="color:#10b981">✅ 云同步已启用！数据已同步到云端。</span>';
+    showToast('云端同步已启用，其他设备刷新即可见', 'success', 4000);
+  } else {
+    resultEl.innerHTML = '<span style="color:#f59e0b">⚠️ 配置成功，但写入云端失败。请确认 Firebase 数据库规则为「测试模式」。</span>';
+  }
+  var statusEl = document.getElementById('sync-status');
+  if (statusEl) statusEl.textContent = '☁️ 已连接';
+}
+
+// 手动立即同步按钮
+async function manualSyncNow() {
+  if (!window.APP_FIREBASE_INITIALIZED) {
+    showToast('请先保存 Firebase 配置并启用云同步', 'error');
+    return;
+  }
+  showToast('正在同步到云端…', 'info', 2000);
+  var ok = await flushCloudSync();
+  if (ok) {
+    window.APP_CLOUD_LAST_HASH = JSON.stringify(window.APP.db);
+    showToast('云端同步完成', 'success');
+  } else {
+    showToast('云端同步失败，请检查网络', 'error');
+  }
+}
+
+function clearFirebaseConfig() {
+  if (!confirm('确定清除 Firebase 配置？清除后云端同步将关闭，但本地数据不会丢失。')) return;
+  var db = window.APP.db;
+  db.settings.firebaseConfig = null;
+  saveDB();
+  window.APP_FIREBASE_CONFIG = null;
+  window.APP_FIREBASE_INITIALIZED = false;
+  var statusEl = document.getElementById('sync-status');
+  if (statusEl) statusEl.textContent = '';
+  renderSettings();
+  showToast('Firebase 配置已清除');
+}
+
+// ==================== JSON 导入导出（跨设备手动同步）====================
+function exportAllData() {
+  var data = JSON.stringify(window.APP.db, null, 2);
+  var textarea = document.getElementById('s-import-data');
+  if (textarea) textarea.value = data;
+  var resultEl = document.getElementById('import-result');
+  resultEl.innerHTML = '<span style="color:#10b981">✅ 数据已导出到上方文本框，请复制全部内容（Ctrl+A → Ctrl+C）</span>';
+  showToast('数据已导出，可复制到其他设备导入', 'success', 3000);
+}
+
+function exportAllDataToFile() {
+  var data = JSON.stringify(window.APP.db, null, 2);
+  var blob = new Blob([data], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var now = new Date();
+  var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  a.href = url;
+  a.download = '销售CRM数据备份_' + dateStr + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  var resultEl = document.getElementById('import-result');
+  resultEl.innerHTML = '<span style="color:#10b981">✅ 文件已下载（备份_' + dateStr + '.json）</span>';
+  showToast('备份文件已下载', 'success', 2000);
+}
+
+function importAllData() {
+  var textarea = document.getElementById('s-import-data');
+  var resultEl = document.getElementById('import-result');
+  var raw = textarea ? textarea.value.trim() : '';
+  if (!raw) {
+    resultEl.innerHTML = '<span style="color:#ef4444">请先在上方粘贴要导入的 JSON 数据</span>';
+    return;
+  }
+  var importedData;
+  try {
+    importedData = JSON.parse(raw);
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:#ef4444">JSON 格式错误：' + e.message + '</span>';
+    return;
+  }
+  // 验证基本结构
+  if (!importedData || typeof importedData !== 'object') {
+    resultEl.innerHTML = '<span style="color:#ef4444">数据格式不正确，不是有效的 CRM 数据</span>';
+    return;
+  }
+  if (!importedData.customers && !importedData.orders && !importedData.cards) {
+    resultEl.innerHTML = '<span style="color:#ef4444">数据缺少必要字段（customers/orders/cards）</span>';
+    return;
+  }
+  if (!confirm('确定导入数据？此操作将覆盖本机当前所有数据。\n\n导入前建议先点「导出数据」备份当前数据。')) return;
+  window.APP.db = importedData;
+  saveDB_localOnly();
+  // 同步到云端（如果已配置）
+  if (window.APP_FIREBASE_INITIALIZED) {
+    saveToCloud(window.APP.db);
+  }
+  navigateTo('dashboard');
+  resultEl.innerHTML = '<span style="color:#10b981">✅ 数据导入成功！已切换到工作台。</span>';
+  showToast('数据导入成功！', 'success', 3000);
+}
+
+
+

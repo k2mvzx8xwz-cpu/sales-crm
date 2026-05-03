@@ -1,7 +1,304 @@
 /**
- * 核心工具.js - 销售客户管理系统 v3.0.0
- * 职责：数据存储、工具函数、全局状态、初始化
+ * 核心工具.js - 销售客户管理系统 v4.0.0
+ * 职责：数据存储（Firebase云同步+localStorage本地备份）、工具函数、全局状态、初始化
+ * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
+// 版本标记：20260502-1430（解决 confirmDialog 点击无响应问题）
+console.log('[核心工具.js] 已加载，版本: 20260502-1430');
+
+// ==================== 全局数据存储层（统一存储，兼容云端同步）====================
+window.DB = {
+  _inited: false,
+  // 初始化 APP.db（从 localStorage 迁移数据）
+  _init() {
+    if (this._inited) return;
+    this._inited = true;
+    if (!window.APP) window.APP = {};
+    if (window.APP.db) return; // 已初始化
+    
+    window.APP.db = {
+      customers: [],
+      sw_orders: [],
+      hw_orders: [],
+      products: [],
+      keycodes: [],
+      brands: [],
+      sw_tpl: { content: '', tips: '' },
+      hw_tpl: { content: '', tips: '' },
+      settings: {},
+      custom_fields: [],
+      _syncing: false
+    };
+    // 迁移旧数据
+    const oldKeys = ['customers', 'sw_orders', 'hw_orders', 'products', 'keycodes', 'brands', 'sw_tpl', 'hw_tpl', 'settings', 'custom_fields'];
+    oldKeys.forEach(function(key) {
+      try {
+        const v = localStorage.getItem('crm_' + key);
+        if (v !== null) {
+          window.APP.db[key] = JSON.parse(v);
+          console.log('[DB] 迁移数据: ' + key + ' (' + (Array.isArray(window.APP.db[key]) ? window.APP.db[key].length : 'object') + ' 条)');
+        }
+      } catch(e) {}
+    });
+  },
+  get(key, def) {
+    this._init();
+    if (def === undefined) def = [];
+    return window.APP.db && window.APP.db[key] !== undefined ? window.APP.db[key] : def;
+  },
+  set(key, val) {
+    this._init();
+    try {
+      window.APP.db[key] = val;
+      localStorage.setItem('crm_' + key, JSON.stringify(val));
+      // 触发云端同步
+      if (window.saveDB) window.saveDB();
+    } catch (e) { console.error('[DB] 存储失败:', e); }
+  }
+};
+
+// ==================== Firebase REST API 云端同步 ====================
+window.APP_FIREBASE_CONFIG = null;
+window.APP_FIREBASE_INITIALIZED = false;
+window.APP_CLOUD_POLLING_TIMER = null;
+window.APP_CLOUD_LAST_HASH = null; // 上次数据hash，用于检测变化
+
+// 获取 Firebase REST URL（不依赖 SDK，纯 URL 拼接）
+function getCloudUrl(path) {
+  const config = (window.APP.db && window.APP.db.settings && window.APP.db.settings.firebaseConfig) || window.APP_FIREBASE_CONFIG;
+  if (!config || !config.databaseURL) return null;
+  const base = config.databaseURL.replace(/\/+$/, '');
+  const p = (path || 'sales_crm_db').replace(/^\//, '');
+  return base + '/' + p + '.json';
+}
+
+// 初始化云同步（REST API 方式，无需加载 SDK）
+function initFirebase() {
+  const config = (window.APP.db && window.APP.db.settings && window.APP.db.settings.firebaseConfig) || window.APP_FIREBASE_CONFIG;
+  if (!config || !config.databaseURL) return false;
+  window.APP_FIREBASE_CONFIG = config;
+  window.APP_FIREBASE_INITIALIZED = true;
+  console.log('[Cloud] Firebase REST API 配置完成（databaseURL:', config.databaseURL + ')');
+  return true;
+}
+
+// fetch 超时包装
+function fetchWithTimeout(url, options, timeoutMs) {
+  timeoutMs = timeoutMs || 8000;
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs))
+  ]);
+}
+
+// 从云端加载数据（REST API GET）
+// throwOnError=true 时连接失败会抛异常（用于测试连接）
+async function loadFromCloud(throwOnError) {
+  const url = getCloudUrl('sales_crm_db');
+  if (!url) {
+    if (throwOnError) throw new Error('databaseURL 为空，请检查配置');
+    return null;
+  }
+  const resp = await fetchWithTimeout(url, { method: 'GET' }, 8000);
+  if (!resp.ok) {
+    let detail = '';
+    try { detail = await resp.text(); } catch(e2) {}
+    const msg = 'HTTP ' + resp.status + (detail ? '：' + detail.substring(0, 100) : '');
+    console.warn('[Cloud] 读取失败', msg);
+    if (throwOnError) throw new Error(msg);
+    return null;
+  }
+  const text = await resp.text();
+  if (!text || text === 'null' || text.trim() === '') {
+    console.log('[Cloud] 云端暂无数据（首次使用或已清空）');
+    return null;
+  }
+  const data = JSON.parse(text);
+  console.log('[Cloud] 从云端读取到数据');
+  return data;
+}
+
+// 保存到云端（REST API PUT）
+async function saveToCloud(data) {
+  const url = getCloudUrl('sales_crm_db');
+  if (!url) { console.error('[Cloud] saveToCloud: URL 为空，请检查 Firebase 配置'); return false; }
+  try {
+    console.log('[Cloud] 正在写入云端...', url.replace(/([^/]+)@.*/, '$1@***')); // 隐藏 token
+    const resp = await fetchWithTimeout(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, 8000);
+    if (resp.ok) { console.log('[Cloud] ✅ 写入云端成功'); return true; }
+    const errText = await resp.text().catch(()=>'无法读取错误');
+    console.error('[Cloud] ❌ 写入失败:', resp.status, errText);
+    return false;
+  } catch (e) {
+    console.error('[Cloud] ❌ 写入云端失败:', e.message);
+    return false;
+  }
+}
+
+// 手动触发一次完整同步（PC保存后调用，或手机端拉取后调用）
+async function flushCloudSync() {
+  if (!window.APP_FIREBASE_INITIALIZED || !window.APP.db) { 
+    console.warn('[Cloud] flushCloudSync: Firebase 未初始化或数据为空'); 
+    return false; 
+  }
+  console.log('[Cloud] 触发完整同步...');
+  return await saveToCloud(window.APP.db);
+}
+
+// 手动同步按钮：从云端拉取最新数据并应用（用户主动触发）
+async function syncNow() {
+  const btn = document.getElementById('mobile-sync-btn');
+  const icon = document.getElementById('sync-icon');
+  const sidebarBtn = document.getElementById('sidebar-sync-btn');
+  const sidebarIcon = document.getElementById('sidebar-sync-icon');
+  const sidebarText = document.getElementById('sidebar-sync-text');
+  
+  // 防止重复点击
+  if (window._SYNC_IN_PROGRESS) {
+    showToast('同步进行中，请稍候...', 'warning');
+    return;
+  }
+  window._SYNC_IN_PROGRESS = true;
+  
+  try {
+    // 显示加载状态（旋转动画）
+    if (icon) icon.style.animation = 'spin 0.8s linear infinite';
+    if (sidebarIcon) sidebarIcon.style.animation = 'spin 0.8s linear infinite';
+    if (sidebarText) sidebarText.textContent = '同步中...';
+    
+    // 检查 Firebase 是否初始化
+    if (!window.APP_FIREBASE_INITIALIZED) {
+      // 尝试初始化
+      const s = window.APP.db && window.APP.db.settings;
+      if (s && s.firebaseConfig && s.firebaseConfig.apiKey) {
+        window.APP_FIREBASE_CONFIG = s.firebaseConfig;
+        await initFirebase();
+      }
+    }
+    
+    if (!window.APP_FIREBASE_INITIALIZED) {
+      showToast('⚠️ 请先在「系统设置」中配置云端同步', 'warning');
+      return;
+    }
+    
+    console.log('[Sync] 开始手动同步...');
+    const cloudData = await loadFromCloud();
+    
+    if (cloudData) {
+      // 云端有数据：用云端数据覆盖本地
+      const oldCount = (window.APP.db && window.APP.db.customers) ? window.APP.db.customers.length : 0;
+      const newCount = cloudData.customers ? cloudData.customers.length : 0;
+      
+      window.APP.db = cloudData;
+      saveDB_localOnly();
+      
+      // 重新渲染当前页面
+      const currentPage = window.APP.currentPage || 'dashboard';
+      const renderMap = {
+        dashboard: typeof renderDashboard === 'function' ? renderDashboard : null,
+        customers: typeof renderCustomers === 'function' ? renderCustomers : null,
+        orders: typeof renderOrders === 'function' ? renderOrders : null,
+        cards: typeof renderCards === 'function' ? renderCards : null,
+        products: typeof renderProducts === 'function' ? renderProducts : null,
+        stats: typeof renderStats === 'function' ? renderStats : null,
+      };
+      if (renderMap[currentPage]) renderMap[currentPage]();
+      
+      showToast('✅ 同步成功！客户：' + oldCount + ' → ' + newCount, 'success', 3000);
+      console.log('[Sync] 同步成功：本地 ' + oldCount + ' 条 → 云端 ' + newCount + ' 条');
+    } else {
+      // 云端无数据：把本地数据推送到云端
+      await saveToCloud(window.APP.db);
+      showToast('✅ 本地数据已推送到云端', 'success', 3000);
+      console.log('[Sync] 本地数据已推送到云端');
+    }
+  } catch (e) {
+    console.error('[Sync] 同步失败：', e);
+    showToast('❌ 同步失败：' + e.message, 'error', 4000);
+  } finally {
+    // 恢复按钮状态
+    window._SYNC_IN_PROGRESS = false;
+    if (icon) icon.style.animation = '';
+    if (sidebarIcon) sidebarIcon.style.animation = '';
+    if (sidebarText) sidebarText.textContent = '同步数据';
+  }
+}
+
+// 启动云端轮询监听（每 5 秒检测一次变化，替代 Firebase SDK 的 on()）
+function startCloudPolling() {
+  if (window.APP_CLOUD_POLLING_TIMER) return; // 防止重复启动
+  window.APP_CLOUD_POLLING_TIMER = setInterval(async function() {
+    if (!window.APP_FIREBASE_INITIALIZED) return;
+    const url = getCloudUrl('sales_crm_db');
+    if (!url) return;
+    try {
+      const resp = await fetchWithTimeout(url, { method: 'GET' }, 5000);
+      if (!resp.ok) return;
+      const text = await resp.text();
+      if (!text || text === 'null' || text.trim() === '') return;
+      const cloudData = JSON.parse(text);
+      const cloudHash = JSON.stringify(cloudData);
+      // 如果云端数据有变化（不是自己刚写入的），合并并更新本地
+      if (cloudHash !== window.APP_CLOUD_LAST_HASH && window.APP_CLOUD_LAST_HASH !== null) {
+        console.log('[Cloud] 检测到其他设备数据变化，正在同步...');
+        const local = loadDB_localOnly();
+        const merged = mergeData(local, cloudData);
+        window.APP.db = merged;
+        saveDB_localOnly();
+        window.APP_CLOUD_LAST_HASH = cloudHash;
+        if (window.APP.currentPage) navigateTo(window.APP.currentPage);
+        showToast('数据已从其他设备同步', 'info');
+      }
+      window.APP_CLOUD_LAST_HASH = cloudHash;
+    } catch (e) { /* 静默失败，不影响用户 */ }
+  }, 5000); // 每 5 秒检查一次
+  console.log('[Cloud] 轮询监听已启动（每 5 秒）');
+}
+
+// 停止轮询
+function stopCloudPolling() {
+  if (window.APP_CLOUD_POLLING_TIMER) {
+    clearInterval(window.APP_CLOUD_POLLING_TIMER);
+    window.APP_CLOUD_POLLING_TIMER = null;
+    console.log('[Cloud] 轮询已停止');
+  }
+}
+
+// 替换 listenCloudChanges（向后兼容）
+function listenCloudChanges(callback) {
+  if (!window.APP_FIREBASE_INITIALIZED) return;
+  startCloudPolling();
+  if (typeof callback === 'function') callback();
+}
+
+// 合并本地和云端数据（云端优先，时间戳较新的优先）
+function mergeData(local, cloud) {
+  if (!cloud) return local;
+  if (!local) return cloud;
+  const result = JSON.parse(JSON.stringify(cloud));
+  // 对每个数组，取并集，相同ID保留时间戳较新的版本
+  ['customers', 'orders', 'products', 'cards', 'cardRecords'].forEach(key => {
+    if (!Array.isArray(result[key])) result[key] = [];
+    if (!Array.isArray(local[key])) local[key] = [];
+    const map = {};
+    [...(result[key] || []), ...(local[key] || [])].forEach(item => {
+      if (!item || !item.id) return;
+      if (!map[item.id] || (item.updatedAt && map[item.id].updatedAt && item.updatedAt > map[item.id].updatedAt)) {
+        map[item.id] = item;
+      }
+    });
+    result[key] = Object.values(map);
+  });
+  // settings 以云端为准
+  if (local.settings) {
+    result.settings = { ...local.settings, ...cloud.settings };
+  }
+  return result;
+}
 
 // ==================== 全局状态 ====================
 window.APP = {
@@ -29,10 +326,19 @@ function getEmptyDB() {
       expressKey: '',
       softwareCopyTemplate: '产品：{产品名称}，订单号：{订单号}，卡密：{卡密}，有效期：{有效期}，购买日期：{购买日期}，金额：¥{金额}，数量：{数量}\n温馨提示：请妥善保存好卡密，仅供学习使用，禁止违法用途，如因个人原因责任需自行承担责任，感谢您的购买，欢迎推荐，推荐享受推荐好礼，赠送时长等。',
       hardwareCopyTemplate: '产品：{产品名称}，金额：¥{金额}，数量：{数量}，订单号：{订单号}，快递：{快递公司}，物流单号：{物流单号}\n温馨提示：请妥善保存，仅供学习使用，禁止违法用途，如因个人原因责任需自行承担责任，感谢您的购买，欢迎推荐，推荐享受增加延长多种保障优惠，享受佣金等奖励。',
-      customerSources: ['微信群', '朋友推荐', '网络广告', '老客户介绍', '其他']
+      customerSources: ['微信群', '朋友推荐', '网络广告', '老客户介绍', '其他'],
+      firebaseConfig: {
+        apiKey: "AIzaSyAi3pnZg6CvovvnKRDAav3KPmBY_1i0s_M",
+        authDomain: "gorun-687e6.firebaseapp.com",
+        databaseURL: "https://gorun-687e6-default-rtdb.firebaseio.com",
+        projectId: "gorun-687e6",
+        storageBucket: "gorun-687e6.firebasestorage.app",
+        messagingSenderId: "554341650997",
+        appId: "1:554341650997:web:c548a01d191547416a977c"
+      }
     },
     productDisplayData: {},
-    version: '3.0.0'
+    version: '4.0.0'
   };
 }
 
@@ -47,36 +353,66 @@ const DEFAULT_PRODUCTS = [
   { name: 'iphone全系列CL双口(全局修改定位，不绑定手机，永久使用，安全稳定，顺丰包邮)', type: 'hardware', price: 388, cost: 200 }
 ];
 
-// ==================== 数据加载/保存 ====================
-function loadDB() {
+// ==================== 本地数据读写（不触发云同步）====================
+function loadDB_localOnly() {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      // 兼容老版本数据，补全缺失字段
       if (!data.settings) data.settings = getEmptyDB().settings;
       if (!data.cardRecords) data.cardRecords = [];
       if (!data.productDisplayData) data.productDisplayData = {};
-      window.APP.db = data;
-    } else {
-      window.APP.db = getEmptyDB();
-      initDefaultData();
+      if (!data.settings.firebaseConfig) data.settings.firebaseConfig = null;
+      return data;
     }
   } catch (e) {
-    console.error('数据加载失败', e);
+    console.error('本地数据加载失败', e);
+  }
+  return null;
+}
+
+function saveDB_localOnly() {
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(window.APP.db));
+  } catch (e) {
+    console.error('本地数据保存失败', e);
+    showToast('本地数据保存失败，存储空间可能不足', 'error');
+  }
+}
+
+// ==================== 统一加载（云端优先，云端无则本地，本地无则初始化）====================
+async function loadDB() {
+  const cloudData = await loadFromCloud();
+  if (cloudData) {
+    window.APP.db = cloudData;
+    saveDB_localOnly(); // 同步到本地备份
+    return;
+  }
+  const localData = loadDB_localOnly();
+  if (localData) {
+    window.APP.db = localData;
+  } else {
     window.APP.db = getEmptyDB();
     initDefaultData();
   }
 }
 
+// ==================== 统一保存（本地+云端双写）====================
+let _cloudSyncTimer = null;
 function saveDB() {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(window.APP.db));
-  } catch (e) {
-    console.error('数据保存失败', e);
-    showToast('数据保存失败，存储空间可能不足', 'error');
-  }
+  saveDB_localOnly();
+  // 防抖：延迟500ms合并写入云端，避免频繁写入
+  if (_cloudSyncTimer) clearTimeout(_cloudSyncTimer);
+  _cloudSyncTimer = setTimeout(async () => {
+    const ok = await saveToCloud(window.APP.db);
+    if (ok === false) {
+      console.warn('[Cloud] 云端同步失败，数据已保存在本设备');
+    }
+  }, 500);
 }
+
+
+
 
 function initDefaultData() {
   const db = window.APP.db;
@@ -142,18 +478,28 @@ function todayStr() {
 }
 
 function calcExpireDate(startDate, category) {
-  if (!startDate) return '';
+  console.log('[calcExpireDate] 计算有效期:', { startDate, category });
+  if (!startDate) { console.log('[calcExpireDate] startDate为空，返回空'); return ''; }
   const d = new Date(startDate);
-  if (isNaN(d.getTime())) return '';
+  if (isNaN(d.getTime())) { console.log('[calcExpireDate] 日期解析失败:', startDate); return ''; }
+  console.log('[calcExpireDate] 原始日期:', d.toString());
   switch (category) {
-    case 'monthly': d.setDate(d.getDate() + 30); break;
-    case 'quarterly': d.setDate(d.getDate() + 90); break;
-    case 'halfyear': d.setDate(d.getDate() + 180); break;
-    case 'yearly': d.setDate(d.getDate() + 365); break;
-    case 'permanent': d.setFullYear(d.getFullYear() + 10); break;
-    default: return '';
+    case 'temp': d.setDate(d.getDate() + 1); console.log('[calcExpireDate] 临时卡+1天'); break;
+    case 'monthly': d.setDate(d.getDate() + 30); console.log('[calcExpireDate] 月卡+30天'); break;
+    case 'quarterly': d.setDate(d.getDate() + 90); console.log('[calcExpireDate] 季卡+90天'); break;
+    case 'halfyear': d.setDate(d.getDate() + 180); console.log('[calcExpireDate] 半年卡+180天'); break;
+    case 'yearly': d.setDate(d.getDate() + 365); console.log('[calcExpireDate] 年卡+365天'); break;
+    case 'permanent': d.setFullYear(d.getFullYear() + 10); console.log('[calcExpireDate] 永久卡+10年'); break;
+    default: console.log('[calcExpireDate] 未知类型:', category); return '';
   }
-  return formatDate(d, 'YYYY-MM-DD');
+  const result = formatDate(d, 'YYYY-MM-DD');
+  console.log('[calcExpireDate] 计算结果:', result);
+  return result;
+}
+
+// 获取完整时间字符串（年月日时分秒）
+function getFullDatetime() {
+  return formatDate(new Date(), 'YYYY-MM-DD HH:mm:ss');
 }
 
 function calcRemainingDays(expireDate) {
@@ -242,15 +588,15 @@ function showModal(title, content, footer = '', size = 'md') {
   const overlay = document.createElement('div');
   overlay.id = 'modal-overlay';
   overlay.className = 'modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);background:rgba(0,0,0,0.65);';
   overlay.innerHTML = `
-    <div id="modal-box" class="modal-box" style="border-radius:12px;width:${sizeMap[size]||'600px'};max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
-        <h3 style="color:var(--text-primary);font-size:16px;font-weight:600;margin:0;">${title}</h3>
-        <button onclick="closeModal()" style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">&times;</button>
+    <div id="modal-box" class="modal-box" style="border-radius:12px;width:${sizeMap[size]||'600px'};max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);background:var(--bg-card,#1e2235);border:1px solid var(--border,#2d3555);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border,#2d3555);">
+        <h3 style="color:var(--text-primary,#e2e8f0);font-size:16px;font-weight:600;margin:0;">${title}</h3>
+        <button onclick="closeModal()" style="background:none;border:none;color:var(--text-secondary,#94a3b8);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">&times;</button>
       </div>
       <div id="modal-body" style="padding:20px;overflow-y:auto;flex:1;">${content}</div>
-      ${footer ? `<div style="padding:16px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">${footer}</div>` : ''}
+      ${footer ? `<div style="padding:16px 20px;border-top:1px solid var(--border,#2d3555);display:flex;justify-content:flex-end;gap:10px;">${footer}</div>` : ''}
     </div>
   `;
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
@@ -262,12 +608,19 @@ function closeModal() {
   if (el) el.remove();
 }
 
-// ==================== 确认弹窗 ====================
-function confirmDialog(msg, onConfirm, title = '确认操作') {
-  showModal(title, `<p style="color:#cbd5e1;font-size:15px;line-height:1.6;">${msg}</p>`,
-    `<button onclick="closeModal()" class="btn-secondary">取消</button>
-     <button onclick="(${onConfirm.toString()})();closeModal();" class="btn-danger">确认</button>`
-  );
+// ==================== 确认弹窗（v20260502 使用原生 confirm 临时方案）====================
+function confirmDialog(msg, onConfirm, title) {
+  // 临时方案：使用原生 confirm，彻底绕过 DOM 弹窗点击无响应问题
+  // 待原生 confirm 验证 callback 能正常执行后，再恢复自定义弹窗
+  var plain = msg.replace(/<[^>]+>/g, ''); // 去掉 HTML 标签
+  if (window.confirm(plain + '\n\n点击「确定」继续执行，点击「取消」中止。')) {
+    try {
+      if (typeof onConfirm === 'function') onConfirm();
+    } catch(e) {
+      console.error('[confirmDialog] 回调执行出错:', e);
+      showToast('操作执行出错：' + e.message, 'error');
+    }
+  }
 }
 
 // ==================== 复制到剪贴板 ====================
@@ -327,16 +680,19 @@ function renderPager(containerId, pager, onPage) {
   const el = document.getElementById(containerId);
   if (!el) return;
   if (pager.totalPages <= 1) { el.innerHTML = ''; return; }
+  // 将回调存入全局注册表，避免 onclick 中函数丢失
+  const cbName = '_pagerCb_' + Math.random().toString(36).substr(2, 6);
+  window[cbName] = onPage;
   let html = `<div class="pager">`;
-  html += `<button ${pager.page <= 1 ? 'disabled' : ''} onclick="(${onPage.toString()})(${pager.page - 1})">上一页</button>`;
+  html += `<button ${pager.page <= 1 ? 'disabled' : ''} onclick="window.${cbName}(${pager.page - 1})">上一页</button>`;
   for (let i = 1; i <= pager.totalPages; i++) {
     if (i === 1 || i === pager.totalPages || Math.abs(i - pager.page) <= 2) {
-      html += `<button class="${i === pager.page ? 'active' : ''}" onclick="(${onPage.toString()})(${i})">${i}</button>`;
+      html += `<button class="${i === pager.page ? 'active' : ''}" onclick="window.${cbName}(${i})">${i}</button>`;
     } else if (Math.abs(i - pager.page) === 3) {
       html += `<span>...</span>`;
     }
   }
-  html += `<button ${pager.page >= pager.totalPages ? 'disabled' : ''} onclick="(${onPage.toString()})(${pager.page + 1})">下一页</button>`;
+  html += `<button ${pager.page >= pager.totalPages ? 'disabled' : ''} onclick="window.${cbName}(${pager.page + 1})">下一页</button>`;
   html += `<span class="pager-info">共${pager.total}条 / ${pager.totalPages}页</span>`;
   html += `</div>`;
   el.innerHTML = html;
@@ -367,23 +723,130 @@ function navigateTo(page) {
   if (fn) fn();
 }
 
-// ==================== 初始化入口 ====================
-function initApp() {
-  loadDB();
-  // 应用设置
-  const s = window.APP.db.settings;
-  if (s.siteName) {
-    document.title = s.siteName;
-    const titleEl = document.getElementById('site-title');
-    if (titleEl) titleEl.textContent = s.siteName;
+// ==================== 初始化入口（优化：本地数据优先显示，云端后台同步）====================
+async function initApp() {
+  var loadingEl = document.getElementById('app-loading');
+
+  // 安全网：10秒后强制隐藏 loading 屏，防止任何情况下卡死
+  var safetyTimer = setTimeout(function() {
+    var el = document.getElementById('app-loading');
+    if (el) { el.style.display = 'none'; console.warn('[initApp] 安全网触发：强制隐藏 loading 屏'); }
+  }, 10000);
+
+  try {
+    // 第一步：立即加载本地数据并渲染（不等待云端，秒开）
+    var localData = loadDB_localOnly();
+    if (localData) {
+      window.APP.db = localData;
+    } else {
+      window.APP.db = getEmptyDB();
+      initDefaultData();
+    }
+
+    // 立即应用设置并渲染工作台
+    var s = window.APP.db.settings;
+    if (s.siteName) {
+      document.title = s.siteName;
+      var titleEl = document.getElementById('site-title');
+      if (titleEl) titleEl.textContent = s.siteName;
+    }
+    if (s.siteLogo) {
+      var logoEl = document.getElementById('site-logo');
+      if (logoEl) { logoEl.src = s.siteLogo; logoEl.style.display = 'block'; }
+    }
+    applyTheme();
+
+    // 直接渲染工作台内容
+    window.APP.currentPage = 'dashboard';
+    var dashboardEl = document.getElementById('page-dashboard');
+    if (dashboardEl) dashboardEl.style.display = 'block';
+
+    // 安全调用 renderDashboard，避免它报错导致 loading 屏卡住
+    if (typeof renderDashboard === 'function') {
+      renderDashboard();
+    } else {
+      console.error('[initApp] renderDashboard 未定义！');
+    }
+
+    // 更新 PC 侧边栏激活状态
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.page === 'dashboard');
+    });
+    // 更新手机端底部导航
+    document.querySelectorAll('.mobile-nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.page === 'dashboard');
+    });
+    if (typeof updateBackBtn === 'function') updateBackBtn();
+
+    // 隐藏加载画面（本地数据已渲染，立即可见）
+    if (loadingEl) {
+      loadingEl.style.opacity = '0';
+      loadingEl.style.transition = 'opacity 0.3s';
+      setTimeout(function() {
+        if (loadingEl) loadingEl.style.display = 'none';
+        clearTimeout(safetyTimer); // 正常隐藏后取消安全网
+      }, 300);
+    }
+
+    // 第二步：云端同步放到 setTimeout 后台执行，绝不阻塞 UI
+    setTimeout(function() { backgroundSync(s); }, 100);
+
+  } catch (e) {
+    console.error('[initApp] 初始化异常：', e);
+    // 立刻隐藏 loading 屏
+    if (loadingEl) loadingEl.style.display = 'none';
+    clearTimeout(safetyTimer);
+    showToast('页面部分加载异常，但您仍可正常使用', 'warning', 4000);
   }
-  if (s.siteLogo) {
-    const logoEl = document.getElementById('site-logo');
-    if (logoEl) { logoEl.src = s.siteLogo; logoEl.style.display = 'block'; }
+}
+
+// 后台云端同步（不阻塞 UI 初始化）
+async function backgroundSync(s) {
+  try {
+    var savedConfig = s && s.firebaseConfig;
+    if (!savedConfig || !savedConfig.apiKey) {
+      console.log('[Cloud] 未配置 Firebase，跳过云同步');
+      return;
+    }
+    window.APP_FIREBASE_CONFIG = savedConfig;
+    var success = await initFirebase();
+    if (!success) {
+      console.warn('[Cloud] Firebase 初始化失败');
+      var statusEl = document.getElementById('sync-status');
+      if (statusEl) statusEl.textContent = '⚠️ 云同步未配置';
+      return;
+    }
+    console.log('[Cloud] 正在从云端加载数据...');
+    var cloudData = await loadFromCloud();
+    if (cloudData) {
+      console.log('[Cloud] 云端有数据，应用云端数据');
+      window.APP.db = cloudData;
+      saveDB_localOnly();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      showToast('✅ 已同步云端数据（' + (cloudData.customers ? cloudData.customers.length : 0) + ' 条客户）', 'success', 3000);
+    } else {
+      console.log('[Cloud] 云端暂无数据，将本地数据推送到云端');
+      await saveToCloud(window.APP.db);
+    }
+    listenCloudChanges();
+    statusEl = document.getElementById('sync-status');
+    if (statusEl) statusEl.textContent = '☁️ 已连接';
+  } catch (e) {
+    console.warn('[Cloud] 后台同步失败（不影响本地使用）：', e.message);
   }
-  // 应用主题
-  applyTheme();
-  navigateTo('dashboard');
+}
+
+// ==================== Firebase 配置更新（从系统设置保存后调用）====================
+async function refreshFirebaseConfig() {
+  const s = window.APP.db && window.APP.db.settings;
+  if (s && s.firebaseConfig) {
+    window.APP_FIREBASE_CONFIG = s.firebaseConfig;
+    const success = initFirebase(); // REST API 同步初始化
+    if (success) {
+      startCloudPolling();
+      showToast('Firebase 已连接，正在同步数据…', 'info', 3000);
+    }
+  }
 }
 
 // ==================== 主题管理（v3.4.0）====================

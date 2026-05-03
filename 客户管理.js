@@ -3,10 +3,24 @@
  * 职责：客户列表、新增/编辑/删除/详情、搜索过滤
  */
 
+// ==================== 事件委托（解决 onclick 在某些环境下不触发的问题）====================
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  var action = el.getAttribute('data-action');
+  var id = el.getAttribute('data-id');
+  if (action === 'delete-customer') {
+    if (id) window.deleteCustomer(id);
+  } else if (action === 'edit-customer') {
+    if (id) window.showEditCustomerModal(id);
+  } else if (action === 'view-customer') {
+    if (id) window.showCustomerDetail(id);
+  }
+});
+
 let customerPage = 1;
 let customerFilter = 'all';
 let customerKeyword = '';
-
 function renderCustomers() {
   const el = document.getElementById('page-customers');
   if (!el) return;
@@ -41,7 +55,7 @@ function renderCustomers() {
         <table class="data-table">
           <thead><tr>
             <th>序号</th><th>微信昵称</th><th>微信号</th><th>手机号</th>
-            <th>类型</th><th>购买次数</th><th>累计金额</th><th>客户来源</th><th>创建时间</th><th>操作</th>
+            <th>类型</th><th>购买次数</th><th>累计金额</th><th>客户来源</th><th>添加时间</th><th>操作</th>
           </tr></thead>
           <tbody>
             ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无客户数据</td></tr>` :
@@ -62,11 +76,11 @@ function renderCustomers() {
                   <td>软件${swOrders.length}次 / 硬件${hwOrders.length}次</td>
                   <td>¥${formatMoney(totalAmt)}</td>
                   <td>${c.source || '-'}</td>
-                  <td>${formatDate(new Date(c.createdAt), 'YYYY-MM-DD')}</td>
+                  <td style="font-size:12px;">${c.addedTime || formatDate(new Date(c.createdAt), 'YYYY-MM-DD HH:mm:ss')}</td>
                   <td class="action-cell">
-                    <button class="btn-xs btn-primary" onclick="showCustomerDetail('${c.id}')">查看</button>
-                    <button class="btn-xs btn-secondary" onclick="showEditCustomerModal('${c.id}')">编辑</button>
-                    <button class="btn-xs btn-danger" onclick="deleteCustomer('${c.id}')">删除</button>
+                    <button class="btn-xs btn-primary" data-action="view-customer" data-id="${c.id}">查看</button>
+                    <button class="btn-xs btn-secondary" data-action="edit-customer" data-id="${c.id}">编辑</button>
+                    <button class="btn-xs btn-danger" data-action="delete-customer" data-id="${c.id}">删除</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -183,23 +197,25 @@ function saveCustomer(editId = null, onCreated = null) {
   if (!wechatName) { showToast('微信昵称不能为空', 'error'); return; }
 
   const db = window.APP.db;
-  const customer = {
-    wechatName,
-    wechatId: document.getElementById('cf-wechatId')?.value?.trim() || '',
-    phone: document.getElementById('cf-phone')?.value?.trim() || '',
-    type: document.getElementById('cf-type')?.value || 'software',
-    cardCategory: document.getElementById('cf-cardCategory')?.value || '',
-    source: document.getElementById('cf-source')?.value || '',
-    receiver: document.getElementById('cf-receiver')?.value?.trim() || '',
-    receiverPhone: document.getElementById('cf-receiverPhone')?.value?.trim() || '',
-    address: document.getElementById('cf-address')?.value?.trim() || '',
-    matchProduct: document.getElementById('cf-matchProduct')?.value?.trim() || '',
-    note: document.getElementById('cf-note')?.value?.trim() || ''
-  };
 
   if (editId) {
     const idx = db.customers.findIndex(c => c.id === editId);
     if (idx === -1) { showToast('客户不存在', 'error'); return; }
+
+    const customer = {
+      wechatName,
+      wechatId: document.getElementById('cf-wechatId')?.value?.trim() || '',
+      phone: document.getElementById('cf-phone')?.value?.trim() || '',
+      type: document.getElementById('cf-type')?.value || 'software',
+      cardCategory: document.getElementById('cf-cardCategory')?.value || '',
+      source: document.getElementById('cf-source')?.value || '',
+      receiver: document.getElementById('cf-receiver')?.value?.trim() || '',
+      receiverPhone: document.getElementById('cf-receiverPhone')?.value?.trim() || '',
+      address: document.getElementById('cf-address')?.value?.trim() || '',
+      matchProduct: document.getElementById('cf-matchProduct')?.value?.trim() || '',
+      note: document.getElementById('cf-note')?.value?.trim() || ''
+    };
+
     Object.assign(db.customers[idx], customer);
     // 同步更新关联订单
     db.orders.forEach(o => {
@@ -214,9 +230,23 @@ function saveCustomer(editId = null, onCreated = null) {
     showToast('客户信息已更新');
     renderCustomers();
   } else {
-    customer.id = genId();
-    customer.name = wechatName;
-    customer.createdAt = Date.now();
+    const customer = {
+      id: genId(),
+      name: wechatName,
+      wechatName,
+      wechatId: document.getElementById('cf-wechatId')?.value?.trim() || '',
+      phone: document.getElementById('cf-phone')?.value?.trim() || '',
+      type: document.getElementById('cf-type')?.value || 'software',
+      cardCategory: document.getElementById('cf-cardCategory')?.value || '',
+      source: document.getElementById('cf-source')?.value || '',
+      receiver: document.getElementById('cf-receiver')?.value?.trim() || '',
+      receiverPhone: document.getElementById('cf-receiverPhone')?.value?.trim() || '',
+      address: document.getElementById('cf-address')?.value?.trim() || '',
+      matchProduct: document.getElementById('cf-matchProduct')?.value?.trim() || '',
+      note: document.getElementById('cf-note')?.value?.trim() || '',
+      addedTime: getFullDatetime(),  // 添加时间（年月日时分秒）
+      createdAt: Date.now()
+    };
     db.customers.push(customer);
     saveDB();
     closeModal();
@@ -236,13 +266,13 @@ function showEditCustomerModal(id) {
 function deleteCustomer(id) {
   const db = window.APP.db;
   const c = db.customers.find(c => c.id === id);
-  if (!c) return;
-  confirmDialog(`确定删除客户「${c.wechatName}」吗？<br><small style="color:#94a3b8">关联订单不会被删除</small>`, () => {
-    db.customers = db.customers.filter(c => c.id !== id);
+  if (!c) { showToast('客户不存在', 'error'); return; }
+  confirmDialog('确定删除客户「' + c.wechatName + '」吗？\n\n关联订单不会被删除', function() {
+    db.customers = db.customers.filter(function(x) { return x.id !== id; });
     saveDB();
-    showToast('客户已删除');
+    showToast('客户已删除', 'success');
     renderCustomers();
-  }, '删除客户');
+  });
 }
 
 // ==================== 客户详情弹窗 ====================
@@ -276,7 +306,7 @@ function showCustomerDetail(id) {
         <div class="detail-item"><span class="detail-key">卡密分类</span><span class="detail-val">${getCardCategoryLabel(c.cardCategory) || '-'}</span></div>
         <div class="detail-item"><span class="detail-key">客户来源</span><span class="detail-val">${c.source || '-'}</span></div>
         <div class="detail-item"><span class="detail-key">备注</span><span class="detail-val">${c.note || '-'}</span></div>
-        <div class="detail-item"><span class="detail-key">创建时间</span><span class="detail-val">${formatDate(new Date(c.createdAt), 'YYYY-MM-DD HH:mm')}</span></div>
+        <div class="detail-item"><span class="detail-key">添加时间</span><span class="detail-val">${c.addedTime || formatDate(new Date(c.createdAt), 'YYYY-MM-DD HH:mm:ss')}</span></div>
       </div>
     </div>
 

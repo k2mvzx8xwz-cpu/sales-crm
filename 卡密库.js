@@ -3,6 +3,21 @@
  * 职责：卡密列表、新增/编辑/删除/批量导入、搜索过滤、详情
  */
 
+// ==================== 事件委托（解决 onclick 在某些环境下不触发的问题）====================
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  var action = el.getAttribute('data-action');
+  var id = el.getAttribute('data-id');
+  if (action === 'delete-card') {
+    if (id) window.deleteCard(id);
+  } else if (action === 'edit-card') {
+    if (id) window.showEditCardModal(id);
+  } else if (action === 'view-card') {
+    if (id) window.showCardDetail(id);
+  }
+});
+
 let cardPage = 1;
 let cardCatFilter = '';
 let cardStatusFilter = '';
@@ -64,10 +79,10 @@ function renderCards() {
         <table class="data-table">
           <thead><tr>
             <th>序号</th><th>分类</th><th>卡密</th><th>状态</th>
-            <th>购买时间</th><th>剩余天数</th><th>有效期</th><th>使用客户</th><th>操作</th>
+            <th>购买时间</th><th>添加时间</th><th>剩余天数</th><th>有效期</th><th>使用客户</th><th>操作</th>
           </tr></thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="9" class="empty-cell">暂无卡密数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无卡密数据</td></tr>` :
               pager.items.map((c, idx) => {
                 const days = calcRemainingDays(c.expireDate);
                 let daysCls = '', daysText = '';
@@ -90,13 +105,14 @@ function renderCards() {
                   </td>
                   <td><span class="badge ${statusBadge}">${statusLabel}</span></td>
                   <td>${c.purchaseDate||'-'}</td>
+                  <td style="font-size:12px;">${c.addedTime||'-'}</td>
                   <td class="${daysCls}">${daysText}</td>
                   <td>${c.expireDate && c.category!=='permanent' ? c.expireDate : (c.category==='permanent'?'永久':'-')}</td>
                   <td>${c.relatedWechatName||'-'}${c.relatedWechatId?' ('+c.relatedWechatId+')':''}</td>
                   <td class="action-cell">
                     <button class="btn-xs btn-primary" onclick="showCardDetail('${c.id}')">详情</button>
                     <button class="btn-xs btn-secondary" onclick="showEditCardModal('${c.id}')">编辑</button>
-                    <button class="btn-xs btn-danger" onclick="deleteCard('${c.id}')">删除</button>
+                    <button class="btn-xs btn-danger" data-action="delete-card" data-id="${c.id}">删除</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -156,6 +172,7 @@ function showAddCardModal(prefill = {}) {
         <div class="form-group form-full">
           <label class="form-label">快捷设置有效期</label>
           <div class="quick-btns">
+            <button type="button" class="quick-btn" onclick="setCardQuickExpire('temp')">临时卡+1天</button>
             <button type="button" class="quick-btn" onclick="setCardQuickExpire('monthly')">月卡+30天</button>
             <button type="button" class="quick-btn" onclick="setCardQuickExpire('quarterly')">季卡+90天</button>
             <button type="button" class="quick-btn" onclick="setCardQuickExpire('halfyear')">半年+180天</button>
@@ -202,6 +219,7 @@ function saveCard(editId = null) {
   if (!code) { showToast('卡密不能为空', 'error'); return; }
 
   const db = window.APP.db;
+  const status = document.getElementById('card-f-status')?.value || 'unused';
 
   // 检查重复（新增时）
   if (!editId && db.cards.some(c => c.cardCode === code)) {
@@ -209,32 +227,74 @@ function saveCard(editId = null) {
     return;
   }
 
-  const card = {
-    category: document.getElementById('card-f-cat')?.value || '',
-    cardCode: code,
-    purchaseDate: document.getElementById('card-f-purchase')?.value || todayStr(),
-    expireDate: document.getElementById('card-f-expire')?.value || '',
-    status: document.getElementById('card-f-status')?.value || 'unused',
-    note: document.getElementById('card-f-note')?.value || ''
-  };
-
   if (editId) {
+    // 编辑模式
     const idx = db.cards.findIndex(c => c.id === editId);
     if (idx === -1) { showToast('卡密不存在', 'error'); return; }
-    Object.assign(db.cards[idx], card);
+
+    const oldStatus = db.cards[idx].status;
+    const category = document.getElementById('card-f-cat')?.value || db.cards[idx].category || '';
+
+    // 更新基本字段
+    Object.assign(db.cards[idx], {
+      category: category,
+      cardCode: code,
+      purchaseDate: document.getElementById('card-f-purchase')?.value || db.cards[idx].purchaseDate || todayStr(),
+      status: status,
+      note: document.getElementById('card-f-note')?.value || ''
+    });
+
+    // 状态为"已使用"时：每次都重新计算使用时间和有效期
+    console.log('[saveCard] 状态检查:', { oldStatus, status, category });
+    if (status === 'used') {
+      db.cards[idx].usedTime = getFullDatetime();
+      console.log('[saveCard] 设置使用时间:', db.cards[idx].usedTime);
+      if (category !== 'permanent') {
+        db.cards[idx].expireDate = calcExpireDate(db.cards[idx].usedTime, category);
+        console.log('[saveCard] 计算有效期:', db.cards[idx].expireDate, '剩余天数:', calcRemainingDays(db.cards[idx].expireDate));
+      } else {
+        db.cards[idx].expireDate = '';
+      }
+    } else {
+      // 非状态变更场景：保留原有的expireDate（或手动修改）
+      db.cards[idx].expireDate = document.getElementById('card-f-expire')?.value || db.cards[idx].expireDate || '';
+    }
+
     // 同步关联订单
     db.orders.forEach(o => {
       if (o.cardCode === db.cards[idx].cardCode || o.cardId === editId) {
-        o.expireDate = card.expireDate;
+        o.expireDate = db.cards[idx].expireDate;
+        o.cardCategory = db.cards[idx].category;
       }
     });
     showToast('卡密已更新');
   } else {
-    card.id = genId();
-    card.createdAt = Date.now();
-    card.relatedOrderNo = '';
-    card.relatedWechatName = '';
-    card.relatedWechatId = '';
+    // 新增模式：不计算有效期，只记录添加时间
+    const category = document.getElementById('card-f-cat')?.value || '';
+    const card = {
+      id: genId(),
+      category: category,
+      cardCode: code,
+      purchaseDate: document.getElementById('card-f-purchase')?.value || todayStr(),
+      expireDate: '',   // 添加时不计算有效期
+      usedTime: '',      // 使用时间（使用后才填）
+      addedTime: getFullDatetime(),  // 添加时间（年月日时分秒）
+      status: status,
+      note: document.getElementById('card-f-note')?.value || '',
+      createdAt: Date.now(),
+      relatedOrderNo: '',
+      relatedWechatName: '',
+      relatedWechatId: ''
+    };
+
+    // 如果新增时状态直接为"已使用"（极少情况），则计算有效期
+    if (status === 'used') {
+      card.usedTime = getFullDatetime();
+      if (category !== 'permanent') {
+        card.expireDate = calcExpireDate(card.usedTime, category);
+      }
+    }
+
     db.cards.push(card);
     showToast('卡密已添加');
   }
@@ -254,13 +314,13 @@ function showEditCardModal(id) {
 function deleteCard(id) {
   const db = window.APP.db;
   const c = db.cards.find(c => c.id === id);
-  if (!c) return;
-  confirmDialog(`确定删除卡密「${c.cardCode.substring(0,20)}...」吗？`, () => {
-    db.cards = db.cards.filter(c => c.id !== id);
+  if (!c) { showToast('卡密不存在', 'error'); return; }
+  confirmDialog('确定删除卡密「' + c.cardCode.substring(0,20) + '...」吗？', function() {
+    db.cards = db.cards.filter(function(x) { return x.id !== id; });
     saveDB();
-    showToast('卡密已删除');
+    showToast('卡密已删除', 'success');
     renderCards();
-  }, '删除卡密');
+  });
 }
 
 // ==================== 批量导入 ====================
@@ -285,7 +345,7 @@ function showBatchImportCards() {
       <label class="form-label required">卡密列表（每行一个）</label>
       <textarea class="form-textarea" id="bi-codes" style="min-height:200px" placeholder="每行一个卡密，空行自动跳过&#10;示例：&#10;ABC123DEF456&#10;GHI789JKL012"></textarea>
     </div>
-    <div class="text-muted" style="font-size:12px">已存在的卡密将自动跳过，有效期从实际使用当天开始计算</div>
+    <div class="text-muted" style="font-size:12px">已存在的卡密将自动跳过。有效期从开始使用时计算，添加时不占用时间。</div>
   `;
 
   showModal('批量导入卡密', content,
@@ -305,6 +365,7 @@ function doBatchImportCards() {
   const existing = new Set(db.cards.map(c => c.cardCode));
   let added = 0, skipped = 0;
 
+  const now = getFullDatetime();
   lines.forEach(code => {
     if (existing.has(code)) { skipped++; return; }
     db.cards.push({
@@ -312,7 +373,9 @@ function doBatchImportCards() {
       category: cat,
       cardCode: code,
       purchaseDate: purchase,
-      expireDate: '',
+      expireDate: '',        // 批量导入时不计算有效期
+      usedTime: '',          // 使用时间（使用后才填）
+      addedTime: now,        // 添加时间（年月日时分秒）
       status: 'unused',
       note: '',
       relatedOrderNo: '',
@@ -360,8 +423,10 @@ function showCardDetail(id) {
         </div>
         <div class="detail-item"><span class="detail-key">状态</span><span class="detail-val">${statusMap[c.status]||'-'}</span></div>
         <div class="detail-item"><span class="detail-key">购买时间</span><span class="detail-val">${c.purchaseDate||'-'}</span></div>
+        <div class="detail-item"><span class="detail-key">添加时间</span><span class="detail-val">${c.addedTime||'-'}</span></div>
+        <div class="detail-item"><span class="detail-key">使用时间</span><span class="detail-val">${c.usedTime||'-'}</span></div>
         <div class="detail-item"><span class="detail-key">剩余天数</span><span class="detail-val ${daysCls}">${daysText}</span></div>
-        <div class="detail-item"><span class="detail-key">有效期至</span><span class="detail-val">${c.expireDate && c.category!=='permanent' ? c.expireDate : (c.category==='permanent'?'永久':'-')}</span></div>
+        <div class="detail-item"><span class="detail-key">有效期至</span><span class="detail-val">${c.expireDate && c.category!=='permanent' ? c.expireDate : (c.category==='permanent'?'永久':(c.status==='unused'?'未使用':'未知'))}</span></div>
         <div class="detail-item"><span class="detail-key">创建时间</span><span class="detail-val">${formatDate(new Date(c.createdAt),'YYYY-MM-DD HH:mm')}</span></div>
         ${c.relatedWechatName ? `<div class="detail-item"><span class="detail-key">关联客户</span><span class="detail-val">${c.relatedWechatName}${c.relatedWechatId?' ('+c.relatedWechatId+')':''}</span></div>` : ''}
         ${c.relatedOrderNo ? `<div class="detail-item"><span class="detail-key">关联订单</span><span class="detail-val mono">${c.relatedOrderNo}</span></div>` : ''}
