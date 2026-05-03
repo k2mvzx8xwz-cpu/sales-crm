@@ -525,8 +525,7 @@ function applyRestoredConfig(data) {
       setTimeout(() => manualSyncNow(), 1000);
     } else {
       showToast('配置已保存，但Firebase初始化失败', 'warning');
-      }
-    });
+    }
   }, '恢复配置');
 }
 
