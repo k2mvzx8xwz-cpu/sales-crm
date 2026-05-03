@@ -5,7 +5,12 @@
 
 function renderSettings() {
   const el = document.getElementById('page-settings');
-  if (!el) return;
+  if (!el) { console.error('[renderSettings] #page-settings 元素不存在'); return; }
+  if (!window.APP || !window.APP.db) {
+    el.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center;">数据未就绪，请刷新页面</div>';
+    console.error('[renderSettings] window.APP.db 未初始化');
+    return;
+  }
   const db = window.APP.db;
   const s = db.settings || {};
   const currentTheme = s.theme || 'dark';
@@ -255,13 +260,11 @@ function renderSettings() {
   `;
 
   // 初始化模板预览 + 清理列表
-  var _self = this;
   setTimeout(function() {
     previewTemplate('software');
     previewTemplate('hardware');
-    var el = document.getElementById('clear-data-list');
-    if (el) initClearDataList();
-  }, 50);
+    initClearDataList();
+  }, 100);
 }
 
 // 保存网站名称
@@ -551,7 +554,7 @@ function importData(input) {
 }
 
 // 清空全部数据
-function clearAllData() {
+async function clearAllData() {
   confirmDialog('⚠️ 此操作将清空所有客户、订单、卡密、购卡记录数据！\n此操作不可恢复！\n\n确定继续吗？', async function() {
     const db = window.APP.db;
     const settings = db.settings;
@@ -630,7 +633,7 @@ function updateClearBtn() {
 }
 
 // 执行清除（直接操作 localStorage['销售管理数据库']，与系统实际存储完全一致）
-function clearSelectedData() {
+async function clearSelectedData() {
   var boxes = document.querySelectorAll('.clear-box:checked');
   if (!boxes.length) { showToast('请先勾选要清除的数据项', 'warning'); return; }
   var keys = [];
@@ -677,14 +680,6 @@ function clearSelectedData() {
     }
   }, '确认清除');
 }
-
-// 每次 renderSettings 后自动初始化清理列表
-var _origRenderSettings = renderSettings;
-renderSettings = function() {
-  _origRenderSettings.apply(this, arguments);
-  var container = document.getElementById('clear-data-list');
-  if (container) setTimeout(initClearDataList, 50);
-};
 
 // ==================== Firebase REST API 云同步配置 ====================
 async function saveFirebaseConfig() {
