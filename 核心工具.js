@@ -88,7 +88,7 @@ function initFirebase() {
   if (!config || !config.databaseURL) return false;
   window.APP_FIREBASE_CONFIG = config;
   window.APP_FIREBASE_INITIALIZED = true;
-  console.log('[Cloud] Firebase 配置完成（databaseURL:', config.databaseURL + ')');
+  // Firebase 配置完成（databaseURL:', config.databaseURL + ')');
   return true;
 }
 
@@ -136,7 +136,7 @@ async function loadFromCloud(throwOnError) {
     return JSON.parse(text);
   } catch (e) {
     if (throwOnError) throw e;
-    console.warn('[Cloud] loadFromCloud 失败:', e.message);
+    // loadFromCloud 失败:', e.message);
     return null;
   }
 }
@@ -152,7 +152,7 @@ async function saveToCloud(data) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }, 20000);
-    if (resp.ok) { console.log('[Cloud] ✅ 云端写入成功'); return true; }
+    if (resp.ok) {  return true; }
     console.error('[Cloud] ❌ 写入失败:', resp.status);
     return false;
   } catch (e) {
@@ -179,14 +179,14 @@ function applyCloudData(cloudData) {
   } else if (typeof renderDashboard === 'function') {
     renderDashboard();
   }
-  console.log('[Cloud] 已应用云端数据');
+  // 已应用云端数据');
 }
 
 // ==================== 实时云同步（Firebase Realtime Database 轮询）====================
 // Firebase Realtime Database REST API 不支持 SSE，改为每 5 秒轮询检测变化
 function startCloudPolling() {
   if (window.APP_CLOUD_POLLING_TIMER) return;
-  console.log('[Cloud] 云同步轮询已启动（每5秒）');
+  // 云同步轮询已启动（每5秒）');
 
   // 首次延迟 3 秒后立即同步一次（页面加载完立即拉取）
   setTimeout(function() { pollCloudOnce(); }, 3000);
@@ -205,7 +205,7 @@ async function pollCloudOnce() {
     const localStr = JSON.stringify(window.APP.db);
     const cloudStr = JSON.stringify(cloudData);
     if (localStr !== cloudStr) {
-      console.log('[Cloud] 检测到云端数据变化，正在同步...');
+      // 检测到云端数据变化，正在同步...');
       applyCloudData(cloudData);
       showToast('📱 云端数据已同步', 'info', 2000);
     }
@@ -339,7 +339,7 @@ async function clearCloudData() {
     const resp = await fetchWithTimeout(url, { method: 'DELETE' }, 20000);
     if (resp.ok || resp.status === 200) {
       showToast('✅ 云端数据已清空', 'success', 3000);
-      console.log('[Cloud] 云端数据已清空');
+      // 云端数据已清空');
     } else {
       showToast('⚠️ 清空失败：' + resp.status, 'error');
     }
@@ -364,7 +364,7 @@ function startCloudPolling() {
       const cloudHash = JSON.stringify(cloudData);
       // 如果云端数据有变化（不是自己刚写入的），合并并更新本地
       if (cloudHash !== window.APP_CLOUD_LAST_HASH && window.APP_CLOUD_LAST_HASH !== null) {
-        console.log('[Cloud] 检测到其他设备数据变化，正在同步...');
+        // 检测到其他设备数据变化，正在同步...');
         const local = loadDB_localOnly();
         const merged = mergeData(local, cloudData);
         window.APP.db = normalizeDB(merged);
@@ -376,7 +376,7 @@ function startCloudPolling() {
       window.APP_CLOUD_LAST_HASH = cloudHash;
     } catch (e) { /* 静默失败，不影响用户 */ }
   }, 5000); // 每 5 秒检查一次
-  console.log('[Cloud] 轮询监听已启动（每 5 秒）');
+  // 轮询监听已启动（每 5 秒）');
 }
 
 // 停止轮询
@@ -384,7 +384,7 @@ function stopCloudPolling() {
   if (window.APP_CLOUD_POLLING_TIMER) {
     clearInterval(window.APP_CLOUD_POLLING_TIMER);
     window.APP_CLOUD_POLLING_TIMER = null;
-    console.log('[Cloud] 轮询已停止');
+    // 轮询已停止');
   }
 }
 
@@ -398,7 +398,7 @@ function listenCloudChanges(callback) {
   // 页面从后台恢复时立即同步一次
   document.addEventListener('visibilitychange', function() {
     if (!document.hidden && window.APP_FIREBASE_INITIALIZED) {
-      console.log('[Cloud] 页面恢复可见，立即检查云端数据');
+      // 页面恢复可见，立即检查云端数据');
       pollCloudOnce();
     }
   });
@@ -535,7 +535,7 @@ function saveDB() {
   _cloudSyncTimer = setTimeout(async () => {
     const ok = await saveToCloud(window.APP.db);
     if (ok === false) {
-      console.warn('[Cloud] 云端同步失败，数据已保存在本设备');
+      // 云端同步失败，数据已保存在本设备');
     }
   }, 500);
 }
@@ -607,23 +607,19 @@ function todayStr() {
 }
 
 function calcExpireDate(startDate, category) {
-  console.log('[calcExpireDate] 计算有效期:', { startDate, category });
-  if (!startDate) { console.log('[calcExpireDate] startDate为空，返回空'); return ''; }
+  if (!startDate) return '';
   const d = new Date(startDate);
-  if (isNaN(d.getTime())) { console.log('[calcExpireDate] 日期解析失败:', startDate); return ''; }
-  console.log('[calcExpireDate] 原始日期:', d.toString());
+  if (isNaN(d.getTime())) return '';
   switch (category) {
-    case 'temp': d.setDate(d.getDate() + 1); console.log('[calcExpireDate] 临时卡+1天'); break;
-    case 'monthly': d.setDate(d.getDate() + 30); console.log('[calcExpireDate] 月卡+30天'); break;
-    case 'quarterly': d.setDate(d.getDate() + 90); console.log('[calcExpireDate] 季卡+90天'); break;
-    case 'halfyear': d.setDate(d.getDate() + 180); console.log('[calcExpireDate] 半年卡+180天'); break;
-    case 'yearly': d.setDate(d.getDate() + 365); console.log('[calcExpireDate] 年卡+365天'); break;
-    case 'permanent': d.setFullYear(d.getFullYear() + 10); console.log('[calcExpireDate] 永久卡+10年'); break;
-    default: console.log('[calcExpireDate] 未知类型:', category); return '';
+    case 'temp': d.setDate(d.getDate() + 1); break;
+    case 'monthly': d.setDate(d.getDate() + 30); break;
+    case 'quarterly': d.setDate(d.getDate() + 90); break;
+    case 'halfyear': d.setDate(d.getDate() + 180); break;
+    case 'yearly': d.setDate(d.getDate() + 365); break;
+    case 'permanent': d.setFullYear(d.getFullYear() + 10); break;
+    default: return '';
   }
-  const result = formatDate(d, 'YYYY-MM-DD');
-  console.log('[calcExpireDate] 计算结果:', result);
-  return result;
+  return formatDate(d, 'YYYY-MM-DD');
 }
 
 // 获取完整时间字符串（年月日时分秒）
@@ -949,34 +945,34 @@ async function backgroundSync(s) {
   try {
     var savedConfig = s && s.firebaseConfig;
     if (!savedConfig || !savedConfig.apiKey) {
-      console.log('[Cloud] 未配置 Firebase，跳过云同步');
+      // 未配置 Firebase，跳过云同步');
       return;
     }
     window.APP_FIREBASE_CONFIG = savedConfig;
     var success = await initFirebase();
     if (!success) {
-      console.warn('[Cloud] Firebase 初始化失败');
+      // Firebase 初始化失败');
       var statusEl = document.getElementById('sync-status');
       if (statusEl) statusEl.textContent = '⚠️ 云同步未配置';
       return;
     }
-    console.log('[Cloud] 正在从云端加载数据...');
+    // 正在从云端加载数据...');
     var cloudData = await loadFromCloud();
     if (cloudData) {
-      console.log('[Cloud] 云端有数据，应用云端数据');
+      // 云端有数据，应用云端数据');
       window.APP.db = normalizeDB(cloudData);
       saveDB_localOnly();
       if (typeof renderDashboard === 'function') renderDashboard();
       showToast('✅ 已同步云端数据（' + (cloudData.customers ? cloudData.customers.length : 0) + ' 条客户）', 'success', 3000);
     } else {
-      console.log('[Cloud] 云端暂无数据，将本地数据推送到云端');
+      // 云端暂无数据，将本地数据推送到云端');
       await saveToCloud(window.APP.db);
     }
     listenCloudChanges();
     statusEl = document.getElementById('sync-status');
     if (statusEl) statusEl.textContent = '☁️ 已连接';
   } catch (e) {
-    console.warn('[Cloud] 后台同步失败（不影响本地使用）：', e.message);
+    // 后台同步失败（不影响本地使用）：', e.message);
   }
 }
 
