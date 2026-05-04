@@ -24,6 +24,14 @@ function renderDashboard() {
   const totalCards = cards.length;
   const unusedCards = cards.filter(c => c.status === 'unused').length;
 
+  // 新增：软件/硬件订单统计
+  const softwareOrders = orders.filter(o => o.type === 'software').length;
+  const hardwareOrders = orders.filter(o => o.type === 'hardware').length;
+
+  // 新增：商品管理/产品销售统计
+  const totalProducts = products.length;
+  const onSaleCount = (db.productSalesData ? Object.values(db.productSalesData).filter(s => s.status === 'on_sale').length : 0);
+
   // 即将到期（30天内）
   const expiringSoon = orders.filter(o => {
     if (o.type !== 'software' || !o.expireDate) return false;
@@ -83,6 +91,38 @@ function renderDashboard() {
           <div class="stat-value">${totalCards}</div>
           <div class="stat-label">卡密总数 <span class="stat-click-hint">📋</span></div>
           <div class="stat-sub">未使用 ${unusedCards} 张</div>
+        </div>
+      </div>
+      <div class="stat-card stat-clickable" onclick="navigateTo('orders-software')" title="点击查看软件订单" style="cursor:pointer;">
+        <div class="stat-icon" style="background:linear-gradient(135deg,#667eea,#764ba2)">💾</div>
+        <div class="stat-body">
+          <div class="stat-value">${softwareOrders}</div>
+          <div class="stat-label">软件订单 <span class="stat-click-hint">📋</span></div>
+          <div class="stat-sub">全部软件类订单</div>
+        </div>
+      </div>
+      <div class="stat-card stat-clickable" onclick="navigateTo('orders-hardware')" title="点击查看硬件订单" style="cursor:pointer;">
+        <div class="stat-icon" style="background:linear-gradient(135deg,#f093fb,#f5576c)">💻</div>
+        <div class="stat-body">
+          <div class="stat-value">${hardwareOrders}</div>
+          <div class="stat-label">硬件订单 <span class="stat-click-hint">📋</span></div>
+          <div class="stat-sub">全部硬件类订单</div>
+        </div>
+      </div>
+      <div class="stat-card stat-clickable" onclick="navigateTo('products')" title="点击查看商品管理" style="cursor:pointer;">
+        <div class="stat-icon" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">📦</div>
+        <div class="stat-body">
+          <div class="stat-value">${totalProducts}</div>
+          <div class="stat-label">商品管理 <span class="stat-click-hint">📋</span></div>
+          <div class="stat-sub">全部商品数量</div>
+        </div>
+      </div>
+      <div class="stat-card stat-clickable" onclick="navigateTo('product-sales')" title="点击查看产品销售" style="cursor:pointer;">
+        <div class="stat-icon" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">📊</div>
+        <div class="stat-body">
+          <div class="stat-value">${onSaleCount}</div>
+          <div class="stat-label">产品销售(已上架) <span class="stat-click-hint">📋</span></div>
+          <div class="stat-sub">已设置销售数据的商品</div>
         </div>
       </div>
       <div class="stat-card ${expiringSoon.length > 0 ? 'stat-card--warning' : ''}">
