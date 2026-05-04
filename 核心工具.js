@@ -828,9 +828,11 @@ function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.page === page);
   });
-  // 切换内容区
+  // 切换内容区：software/hardware 订单都显示 page-orders
+  var pageKey = page;
+  if (page === 'orders-software' || page === 'orders-hardware') pageKey = 'orders';
   document.querySelectorAll('.page-section').forEach(el => {
-    el.style.display = el.id === `page-${page}` ? 'block' : 'none';
+    el.style.display = el.id === `page-${pageKey}` ? 'block' : 'none';
   });
   // 触发对应模块渲染
   const renderMap = {
@@ -841,11 +843,13 @@ function navigateTo(page) {
     products: typeof renderProducts === 'function' ? renderProducts : null,
     'product-sales': typeof renderProductSales === 'function' ? renderProductSales : null,
     stats: typeof renderStats === 'function' ? renderStats : null,
-    settings: typeof renderSettings === 'function' ? renderSettings : null
+    settings: typeof renderSettings === 'function' ? renderSettings : null,
+    'orders-software': null,  // 由下面特殊处理
+    'orders-hardware': null
   };
   // 特殊处理：软件/硬件订单先设置过滤器再渲染
-  if (page === 'orders-software') { if(typeof setOrderFilterAndRender==='function') setOrderFilterAndRender('software'); return; }
-  if (page === 'orders-hardware') { if(typeof setOrderFilterAndRender==='function') setOrderFilterAndRender('hardware'); return; }
+  if (page === 'orders-software') { if(typeof setOrderFilterAndRender==='function') { setOrderFilterAndRender('software'); return; } }
+  if (page === 'orders-hardware') { if(typeof setOrderFilterAndRender==='function') { setOrderFilterAndRender('hardware'); return; } }
   const fn = renderMap[page];
   if (fn) fn();
 }

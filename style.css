@@ -842,7 +842,7 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   flex-shrink: 0;
 }
 
-/* ==================== 移动端底部导航栏（网格布局） ==================== */
+/* ==================== 移动端底部导航栏（横向滚动单排） ==================== */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
@@ -852,32 +852,38 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   background: var(--bg-primary);
   border-top: 1px solid var(--border);
   z-index: 1000;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 10px 10px 14px;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
-  max-height: 200px;
-  overflow-y: auto;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  padding: 6px 4px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  scrollbar-width: none;
+  gap: 2px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
 }
+
+.mobile-bottom-nav::-webkit-scrollbar { display: none; }
 
 .mobile-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 4px;
+  justify-content: center;
+  gap: 1px;
+  padding: 8px 10px 6px;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s;
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 500;
-  transition: all 0.2s;
-  border-radius: 10px;
-  min-width: 0;
-  text-align: center;
-  border: 1px solid transparent;
-  background: var(--bg-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 48px;
+  -webkit-tap-highlight-color: transparent;
+  border: none;
+  background: none;
 }
 
 .mobile-nav-item:active { transform: scale(0.95); background: var(--bg-hover); }
@@ -889,6 +895,31 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   font-weight: 600;
 }
 .mobile-nav-icon { font-size: 18px; line-height: 1; }
+
+/* ==================== 手机端悬浮同步按钮 ==================== */
+.mobile-sync-btn {
+  display: none;
+  position: fixed;
+  bottom: 76px;
+  right: 16px;
+  z-index: 1001;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.mobile-sync-btn:active { transform: scale(0.9); }
+@media (max-width: 768px) {
+  .mobile-sync-btn { display: flex !important; }
+}
 
 /* ==================== 侧边栏遮罩层 ==================== */
 .sidebar-overlay {
@@ -933,7 +964,7 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
 @media (max-width: 768px) {
   /* 隐藏桌面端侧边栏主题切换，显示底部导航 */
   .sidebar .sidebar-bottom { display: none !important; }
-  .mobile-bottom-nav { display: grid !important; }
+  .mobile-bottom-nav { display: flex !important; }
 
   /* 主内容区：去掉侧边栏宽度偏移，底部留出导航栏空间（导航栏最多两行约120px） */
   .main-content {
