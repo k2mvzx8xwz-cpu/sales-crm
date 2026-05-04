@@ -1097,3 +1097,11 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   .main-content { margin: 0 !important; padding: 0 !important; }
   .data-table { font-size: 11px; }
 }
+
+/* ==================== 产品销售页面 ==================== */
+.badge-red { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); }
+#page-product-sales .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  #page-product-sales .data-table { min-width: 900px; }
+}
+

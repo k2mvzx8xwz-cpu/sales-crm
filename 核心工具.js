@@ -21,6 +21,7 @@ window.DB = {
       sw_orders: [],
       hw_orders: [],
       products: [],
+      productSalesData: {},  // 产品销售额外数据：成本价格、代理商价格、销售价格、状态
       keycodes: [],
       brands: [],
       sw_tpl: { content: '', tips: '' },

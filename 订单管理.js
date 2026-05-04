@@ -181,6 +181,7 @@ function showAddOrderModal(defaultType = 'software', prefill = {}) {
               autocomplete="off">
             <div id="customer-dropdown" class="custom-dropdown" style="display:none;"></div>
           </div>
+          <button type="button" class="btn-secondary" onclick="showCustomerPicker()" title="从现有客户中选择">浏览...</button>
           <input type="hidden" id="of-customerId" value="${prefill.customerId||''}">
           <button type="button" class="btn-secondary" onclick="showQuickAddCustomer()" title="快速新增客户">+ 新客户</button>
         </div>
@@ -555,6 +556,53 @@ function onCustomerChange(customerId) {
   const c = db.customers.find(c => c.id === customerId);
   if (!c) return;
   if (c.type === 'hardware') fillFromCustomerAddress();
+}
+
+// ==================== 客户选择器（任务3） ====================
+function showCustomerPicker() {
+  const content = `
+    <div class="filter-tabs" style="margin-bottom:12px;">
+      <button class="filter-tab active" data-type="all" onclick="renderCustomerPickerList(this)">全部</button>
+      <button class="filter-tab" data-type="software" onclick="renderCustomerPickerList(this)">软件客户</button>
+      <button class="filter-tab" data-type="hardware" onclick="renderCustomerPickerList(this)">硬件客户</button>
+    </div>
+    <div id="customer-picker-list" style="max-height:380px;overflow-y:auto;"></div>
+  `;
+  showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button>`);
+  setTimeout(() => renderCustomerPickerList(document.querySelector('[data-type="all"]')), 50);
+}
+
+function renderCustomerPickerList(btn) {
+  if (!btn) return;
+  const type = btn.dataset.type;
+  const db = window.APP.db;
+  let list = db.customers || [];
+  if (type !== 'all') list = list.filter(c => c.type === type);
+  document.querySelectorAll('#modal-body .filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const container = document.getElementById('customer-picker-list');
+  if (!container) return;
+  container.innerHTML = list.length === 0
+    ? '<div class="empty-cell">暂无客户</div>'
+    : list.map(c => `
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;"
+             onclick="selectCustomerForOrder('${c.id}')"
+             onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+          <span class="badge ${c.type==='software'?'badge-blue':'badge-green'}">${c.type==='software'?'软件':'硬件'}</span>
+          <span style="flex:1;color:var(--text-primary);">${c.wechatName||''} ${c.wechatId?'('+c.wechatId+')':''}</span>
+          <span style="font-size:12px;color:var(--text-muted);">${c.phone||''}</span>
+        </div>
+      `).join('');
+}
+
+function selectCustomerForOrder(id) {
+  const db = window.APP.db;
+  const c = db.customers.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('of-customerSearch').value = `${c.wechatName}${c.wechatId?' ('+c.wechatId+')':''}`;
+  document.getElementById('of-customerId').value = id;
+  closeModal();
+  onCustomerChange(id);
 }
 
 // ========== 调整2：客户模糊搜索下拉 ==========
