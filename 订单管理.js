@@ -637,10 +637,11 @@ function renderCustomerPickerList(btn) {
   if (!container) return;
   container.innerHTML = list.length === 0
     ? '<div class="empty-cell">暂无客户</div>'
-    : list.map(c => `
+    : list.map((c, idx) => `
         <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;"
              onclick="selectCustomerForOrder('${c.id}')"
              onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+          <span style="font-size:12px;color:var(--text-muted);min-width:28px;text-align:center;">${idx+1}</span>
           <span class="badge ${c.type==='software'?'badge-blue':'badge-green'}">${c.type==='software'?'软件':'硬件'}</span>
           <span style="flex:1;color:var(--text-primary);">${c.wechatName||''} ${c.wechatId?'('+c.wechatId+')':''}</span>
           <span style="font-size:12px;color:var(--text-muted);">${c.phone||''}</span>

@@ -842,36 +842,41 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   flex-shrink: 0;
 }
 
-/* ==================== 移动端底部导航栏 ==================== */
+/* ==================== 移动端底部导航栏（支持换行） ==================== */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 56px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   z-index: 1000;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 6px 4px 8px;
+  gap: 2px;
   box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .mobile-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 8px;
+  gap: 1px;
+  padding: 4px 6px;
   cursor: pointer;
   color: var(--text-muted);
   font-size: 10px;
   transition: color 0.15s;
   border-radius: 8px;
-  min-width: 52px;
+  min-width: 48px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .mobile-nav-item:active { background: var(--bg-hover); }
@@ -923,9 +928,9 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
   .sidebar .sidebar-bottom { display: none !important; }
   .mobile-bottom-nav { display: flex !important; }
 
-  /* 主内容区：去掉侧边栏宽度偏移，底部留出导航栏空间 */
+  /* 主内容区：去掉侧边栏宽度偏移，底部留出导航栏空间（导航栏最多两行约120px） */
   .main-content {
-    padding: 12px 12px 72px;
+    padding: 12px 12px 132px;
     margin-top: 52px;
     min-height: 100vh;
     box-sizing: border-box;
