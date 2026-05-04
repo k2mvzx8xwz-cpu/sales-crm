@@ -264,8 +264,11 @@ async function syncNow() {
         dashboard: typeof renderDashboard === 'function' ? renderDashboard : null,
         customers: typeof renderCustomers === 'function' ? renderCustomers : null,
         orders: typeof renderOrders === 'function' ? renderOrders : null,
+        'orders-software': typeof setOrderFilterAndRender === 'function' ? () => setOrderFilterAndRender('software') : null,
+        'orders-hardware': typeof setOrderFilterAndRender === 'function' ? () => setOrderFilterAndRender('hardware') : null,
         cards: typeof renderCards === 'function' ? renderCards : null,
         products: typeof renderProducts === 'function' ? renderProducts : null,
+        'product-sales': typeof renderProductSales === 'function' ? renderProductSales : null,
         stats: typeof renderStats === 'function' ? renderStats : null,
         settings: typeof renderSettings === 'function' ? renderSettings : null,
       };
@@ -285,7 +288,7 @@ async function syncNow() {
     }
   } catch (e) {
     console.error('[Sync] 同步失败：', e);
-    showToast('❌ 同步失败：' + e.message, 'error', 4000);
+    showToast('❌ 同步失败：' + (e.message || e.toString() || '未知错误'), 'error', 4000);
   } finally {
     // 恢复按钮状态
     window._syncInProgress = false;
