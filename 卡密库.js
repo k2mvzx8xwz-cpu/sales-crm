@@ -244,16 +244,19 @@ function saveCard(editId = null) {
       note: document.getElementById('card-f-note')?.value || ''
     });
 
-    // 状态为"已使用"时：每次都重新计算使用时间和有效期
-    console.log('[saveCard] 状态检查:', { oldStatus, status, category });
+    // 状态为"已使用"时：只在首次切换为used时记录使用时间和计算有效期
     if (status === 'used') {
-      db.cards[idx].usedTime = getFullDatetime();
-      console.log('[saveCard] 设置使用时间:', db.cards[idx].usedTime);
-      if (category !== 'permanent') {
-        db.cards[idx].expireDate = calcExpireDate(db.cards[idx].usedTime, category);
-        console.log('[saveCard] 计算有效期:', db.cards[idx].expireDate, '剩余天数:', calcRemainingDays(db.cards[idx].expireDate));
+      // 如果之前没有usedTime（首次设为已使用），记录当前时间并重新计算有效期
+      if (!db.cards[idx].usedTime || oldStatus !== 'used') {
+        db.cards[idx].usedTime = getFullDatetime();
+        if (category !== 'permanent') {
+          db.cards[idx].expireDate = calcExpireDate(todayStr(), category);
+        } else {
+          db.cards[idx].expireDate = '';
+        }
       } else {
-        db.cards[idx].expireDate = '';
+        // 已使用状态保存：不重置usedTime，允许手动修改有效期
+        db.cards[idx].expireDate = document.getElementById('card-f-expire')?.value || db.cards[idx].expireDate || '';
       }
     } else {
       // 非状态变更场景：保留原有的expireDate（或手动修改）
@@ -287,11 +290,11 @@ function saveCard(editId = null) {
       relatedWechatId: ''
     };
 
-    // 如果新增时状态直接为"已使用"（极少情况），则计算有效期
+    // 如果新增时状态直接为"已使用"，记录使用时间并从今天计算有效期
     if (status === 'used') {
       card.usedTime = getFullDatetime();
       if (category !== 'permanent') {
-        card.expireDate = calcExpireDate(card.usedTime, category);
+        card.expireDate = calcExpireDate(todayStr(), category);
       }
     }
 
