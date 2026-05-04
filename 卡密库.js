@@ -22,6 +22,7 @@ let cardPage = 1;
 let cardCatFilter = '';
 let cardStatusFilter = '';
 let cardKeyword = '';
+let cardSelected = []; // 已选中的卡密ID列表
 
 function renderCards() {
   const el = document.getElementById('page-cards');
@@ -43,7 +44,9 @@ function renderCards() {
   el.innerHTML = `
     <div class="page-header">
       <h2 class="page-title">卡密库</h2>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn-danger" onclick="batchDeleteCards()" ${cardSelected.length===0?'disabled style="opacity:0.5;cursor:not-allowed;"':''}>批量删除 (${cardSelected.length})</button>
+        <button class="btn-secondary" onclick="batchChangeCategory()" ${cardSelected.length===0?'disabled style="opacity:0.5;cursor:not-allowed;"':''}>批量改分类</button>
         <button class="btn-secondary" onclick="showBatchImportCards()">📥 批量导入</button>
         <button class="btn-primary" onclick="showAddCardModal()">+ 新增卡密</button>
       </div>
@@ -78,13 +81,15 @@ function renderCards() {
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
+            <th style="width:40px;"><input type="checkbox" onchange="toggleCardSelectAll(this)" ${pager.items.length===0?'disabled':''}></th>
             <th>序号</th><th>分类</th><th>卡密</th><th>状态</th>
             <th>购买时间</th><th>添加时间</th><th>剩余天数</th><th>有效期</th><th>使用客户</th><th>操作</th>
           </tr></thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无卡密数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="11" class="empty-cell">暂无卡密数据</td></tr>` :
               pager.items.map((c, idx) => {
                 const days = calcRemainingDays(c.expireDate);
+                const isChecked = cardSelected.includes(c.id);
                 let daysCls = '', daysText = '';
                 if (c.category === 'permanent') { daysText = '永久'; daysCls = 'text-success'; }
                 else if (days === null) { daysText = '-'; }
@@ -97,6 +102,7 @@ function renderCards() {
                 const [statusLabel, statusBadge] = statusMap[c.status] || ['未知', 'badge-gray'];
 
                 return `<tr>
+                  <td><input type="checkbox" class="card-cb" value="${c.id}" ${isChecked?'checked':''} onchange="onCardCheckChange('${c.id}', this.checked)"></td>
                   <td>${(cardPage-1)*15+idx+1}</td>
                   <td><span class="badge badge-purple">${getCardCategoryLabel(c.category)}</span></td>
                   <td>
@@ -392,6 +398,86 @@ function doBatchImportCards() {
   saveDB();
   closeModal();
   showToast(`导入完成：新增 ${added} 张，跳过 ${skipped} 张`);
+  renderCards();
+}
+
+// ==================== 批量操作 ====================
+function onCardCheckChange(id, checked) {
+  if (checked) { if (!cardSelected.includes(id)) cardSelected.push(id); }
+  else { cardSelected = cardSelected.filter(x => x !== id); }
+  refreshBatchCardBtns();
+}
+
+function toggleCardSelectAll(master) {
+  if (master.checked) {
+    const db = window.APP.db;
+    let list = [...(db.cards||[])].sort((a,b)=>b.createdAt-a.createdAt);
+    if (cardCatFilter) list = list.filter(c=>c.category===cardCatFilter);
+    if (cardStatusFilter) list = list.filter(c=>c.status===cardStatusFilter);
+    if (cardKeyword) list = filterList(list, cardKeyword, ['cardCode','relatedWechatName','relatedWechatId']);
+    cardSelected = list.map(c=>c.id);
+  } else { cardSelected = []; }
+  document.querySelectorAll('.card-cb').forEach(cb=>{ cb.checked = master.checked; });
+  refreshBatchCardBtns();
+}
+
+function refreshBatchCardBtns() {
+  document.querySelectorAll('#page-cards .page-header [onclick]').forEach(btn=>{
+    if (btn.textContent.includes('批量删除')) {
+      btn.disabled = cardSelected.length===0;
+      btn.style.opacity = cardSelected.length===0?'0.5':'1';
+      btn.textContent = `批量删除 (${cardSelected.length})`;
+    }
+    if (btn.textContent.includes('批量改分类')) {
+      btn.disabled = cardSelected.length===0;
+      btn.style.opacity = cardSelected.length===0?'0.5':'1';
+    }
+  });
+}
+
+function batchDeleteCards() {
+  if (cardSelected.length===0){showToast('请先选择卡密','error');return;}
+  confirmDialog(`确定批量删除选中的 <b>${cardSelected.length}</b> 张卡密吗？`,function(){
+    const db=window.APP.db;
+    db.cards = db.cards.filter(c=>!cardSelected.includes(c.id));
+    saveDB();
+    cardSelected=[];
+    showToast('批量删除完成');
+    renderCards();
+  },'批量删除卡密');
+}
+
+function batchChangeCategory() {
+  if (cardSelected.length===0){showToast('请先选择卡密','error');return;}
+  const content=`<div class="form-group">
+    <label class="form-label">将选中 ${cardSelected.length} 张卡密的分类修改为</label>
+    <select class="form-select" id="batch-cat-select">
+      <option value="">请选择</option>
+      <option value="temp">临时卡</option>
+      <option value="monthly">月卡</option>
+      <option value="quarterly">季卡</option>
+      <option value="halfyear">半年卡</option>
+      <option value="yearly">年卡</option>
+      <option value="permanent">永久卡</option>
+    </select>
+  </div>`;
+  showModal('批量修改分类',content,
+    `<button onclick="closeModal()" class="btn-secondary">取消</button>
+     <button onclick="execBatchChangeCategory()" class="btn-primary">确认修改</button>`);
+}
+
+function execBatchChangeCategory() {
+  const cat=document.getElementById('batch-cat-select')?.value;
+  if(!cat){showToast('请选择分类','error');return;}
+  const db=window.APP.db;
+  cardSelected.forEach(id=>{
+    const c=db.cards.find(c=>c.id===id);
+    if(c){c.category=cat; if(cat==='permanent')c.expireDate='';}
+  });
+  saveDB();
+  closeModal();
+  showToast(`已将 ${cardSelected.length} 张卡密改为「${getCardCategoryLabel(cat)}」`);
+  cardSelected=[];
   renderCards();
 }
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>销售客户管理系统</title>
-  <link rel="stylesheet" href="style.css?v=202605041400">
+  <link rel="stylesheet" href="style.css?v=202605041320">
 </head>
 <body>
 <div class="app-layout">
@@ -151,16 +151,16 @@
 </style>
 
 <!-- JS模块加载（顺序很重要） -->
-<script src="核心工具.js?v=202605041400"></script>
-<script src="工作台.js?v=202605041400"></script>
-<script src="客户管理.js?v=202605041400"></script>
-<script src="订单管理.js?v=202605041400"></script>
-<script src="卡密库.js?v=202605041400"></script>
-<script src="商品管理.js?v=202605041400"></script>
-<script src="产品销售.js?v=202605041400"></script>
-<script src="数据统计.js?v=202605041400"></script>
-<script src="系统设置.js?v=202605041400"></script>
-<script src="扩展功能.js?v=202605041400"></script>
+<script src="核心工具.js?v=202605041320"></script>
+<script src="工作台.js?v=202605041320"></script>
+<script src="客户管理.js?v=202605041320"></script>
+<script src="订单管理.js?v=202605041320"></script>
+<script src="卡密库.js?v=202605041320"></script>
+<script src="商品管理.js?v=202605041320"></script>
+<script src="产品销售.js?v=202605041320"></script>
+<script src="数据统计.js?v=202605041320"></script>
+<script src="系统设置.js?v=202605041320"></script>
+<script src="扩展功能.js?v=202605041320"></script>
 
 <script>
 // 移动端菜单控制
@@ -195,11 +195,14 @@ navigateTo = function(page) {
   var titles = { dashboard:'工作台', customers:'客户管理', orders:'订单管理', cards:'卡密库', products:'商品管理', 'product-sales':'产品销售', 'orders-software':'软件订单', 'orders-hardware':'硬件订单', stats:'数据统计', settings:'系统设置' };
   var el = document.getElementById('mobile-header-title');
   if (el) el.textContent = titles[page] || page;
-  // 更新底部导航激活状态（订单相关统一高亮"订单"tab）
+  // 更新底部导航激活状态
   document.querySelectorAll('.mobile-nav-item').forEach(function(item) {
     var mp = item.dataset.page;
     var active = (mp === 'orders' && page === 'orders');
-    item.classList.toggle('active', active);
+    // 软件/硬件订单分别高亮对应tab（如果存在）
+    if (mp === 'orders-software') item.classList.toggle('active', page === 'orders' && orderFilter === 'software');
+    else if (mp === 'orders-hardware') item.classList.toggle('active', page === 'orders' && orderFilter === 'hardware');
+    else item.classList.toggle('active', active);
   });
 };
 

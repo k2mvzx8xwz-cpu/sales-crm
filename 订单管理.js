@@ -12,6 +12,7 @@ let orderPage = 1;
 let orderFilter = 'all';
 let orderKeyword = '';
 let _orderCardCodeBackfilled = false;
+let orderSelected = [];
 
 // 一次性回填：有 cardId 但无 cardCode 的旧订单，从卡密库补全 cardCode
 function backfillOrderCardCode() {
@@ -48,7 +49,8 @@ function renderOrders() {
   el.innerHTML = `
     <div class="page-header">
       <h2 class="page-title">订单管理</h2>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn-danger" onclick="batchDeleteOrders()" ${orderSelected.length===0?'disabled style="opacity:0.5;cursor:not-allowed;"':''}>批量删除 (${orderSelected.length})</button>
         <button class="btn-primary" onclick="showAddOrderModal('software')">+ 新增软件订单</button>
         <button class="btn-success" onclick="showAddOrderModal('hardware')">+ 新增硬件订单</button>
       </div>
@@ -69,6 +71,7 @@ function renderOrders() {
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width:40px;"><input type="checkbox" onchange="toggleOrderSelectAll(this)" ${pager.items.length===0?'disabled':''}></th>
               <th>序号</th>
               <th>订单号</th>
               <th>微信昵称</th>
@@ -90,8 +93,9 @@ function renderOrders() {
             </tr>
           </thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无订单数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="11" class="empty-cell">暂无订单数据</td></tr>` :
               pager.items.map((o, idx) => {
+                const isChecked = orderSelected.includes(o.id);
                 const pName = o.productName || '-';
                 // 软件订单：卡密（点击可复制）
                 // 优先用 order 上存的 cardCode；旧订单只有 cardId 时反查卡密库
@@ -121,6 +125,7 @@ function renderOrders() {
                   ? formatRemainingTime(o.expireDate)
                   : '-';
                 return `<tr class="${rowClass}">
+                  <td><input type="checkbox" class="order-cb" value="${o.id}" ${isChecked?'checked':''} onchange="onOrderCheckChange('${o.id}', this.checked)"></td>
                   <td>${(orderPage-1)*15+idx+1}</td>
                   <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td>${o.wechatName||'-'}</td>
@@ -1252,4 +1257,46 @@ function copyOrderByTemplate(id) {
 
   const text = renderTemplate(template, vars);
   copyToClipboard(text, '订单信息已复制');
+}
+
+// ==================== 批量操作 ====================
+function onOrderCheckChange(id, checked) {
+  if (checked) { if (!orderSelected.includes(id)) orderSelected.push(id); }
+  else { orderSelected = orderSelected.filter(x => x !== id); }
+  refreshBatchOrderBtn();
+}
+
+function toggleOrderSelectAll(master) {
+  if (master.checked) {
+    const db = window.APP.db;
+    let list = [...(db.orders||[])].sort((a,b)=>b.createdAt-a.createdAt);
+    if (orderFilter !== 'all') list = list.filter(o=>o.type===orderFilter);
+    if (orderKeyword) list = filterList(list, orderKeyword, ['orderNo','wechatName','customerName','productName','wechatId']);
+    orderSelected = list.map(o=>o.id);
+  } else { orderSelected = []; }
+  document.querySelectorAll('.order-cb').forEach(cb=>{ cb.checked = master.checked; });
+  refreshBatchOrderBtn();
+}
+
+function refreshBatchOrderBtn() {
+  const btns = document.querySelectorAll('#page-orders .page-header [onclick]');
+  btns.forEach(btn=>{
+    if (btn.textContent.includes('批量删除')) {
+      btn.disabled = orderSelected.length===0;
+      btn.style.opacity = orderSelected.length===0?'0.5':'1';
+      btn.textContent = `批量删除 (${orderSelected.length})`;
+    }
+  });
+}
+
+function batchDeleteOrders() {
+  if (orderSelected.length===0){showToast('请先选择订单','error');return;}
+  confirmDialog(`确定批量删除选中的 <b>${orderSelected.length}</b> 个订单吗？`,function(){
+    const db=window.APP.db;
+    db.orders = db.orders.filter(o=>!orderSelected.includes(o.id));
+    saveDB();
+    orderSelected=[];
+    showToast('批量删除完成');
+    renderOrders();
+  },'批量删除订单');
 }

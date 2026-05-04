@@ -21,6 +21,7 @@ document.addEventListener('click', function(e) {
 let customerPage = 1;
 let customerFilter = 'all';
 let customerKeyword = '';
+let customerSelected = [];
 function renderCustomers() {
   const el = document.getElementById('page-customers');
   if (!el) return;
@@ -37,7 +38,10 @@ function renderCustomers() {
   el.innerHTML = `
     <div class="page-header">
       <h2 class="page-title">客户管理</h2>
-      <button class="btn-primary" onclick="showAddCustomerModal()">+ 新增客户</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-danger" onclick="batchDeleteCustomers()" ${customerSelected.length===0?'disabled style="opacity:0.5;cursor:not-allowed;"':''}>批量删除 (${customerSelected.length})</button>
+        <button class="btn-primary" onclick="showAddCustomerModal()">+ 新增客户</button>
+      </div>
     </div>
     <div class="toolbar">
       <div class="filter-tabs">
@@ -54,17 +58,20 @@ function renderCustomers() {
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
+            <th style="width:40px;"><input type="checkbox" onchange="toggleCustomerSelectAll(this)" ${pager.items.length===0?'disabled':''}></th>
             <th>序号</th><th>微信昵称</th><th>微信号</th><th>手机号</th>
             <th>类型</th><th>购买次数</th><th>累计金额</th><th>客户来源</th><th>添加时间</th><th>操作</th>
           </tr></thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无客户数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="11" class="empty-cell">暂无客户数据</td></tr>` :
               pager.items.map((c, idx) => {
                 const swOrders = db.orders.filter(o => o.customerId === c.id && o.type === 'software');
                 const hwOrders = db.orders.filter(o => o.customerId === c.id && o.type === 'hardware');
                 const totalAmt = db.orders.filter(o => o.customerId === c.id && !o.isOldCustomer)
                   .reduce((s, o) => s + (Number(o.totalAmount) || 0), 0);
+                const isChecked = customerSelected.includes(c.id);
                 return `<tr>
+                  <td><input type="checkbox" class="cust-cb" value="${c.id}" ${isChecked?'checked':''} onchange="onCustomerCheckChange('${c.id}', this.checked)"></td>
                   <td>${(customerPage-1)*15+idx+1}</td>
                   <td><a href="#" class="link" onclick="showCustomerDetail('${c.id}')">${c.wechatName || '-'}</a></td>
                   <td>
@@ -383,4 +390,46 @@ function showCustomerDetail(id) {
   showModal(`客户详情 - ${c.wechatName}`, content,
     `<button onclick="closeModal()" class="btn-secondary">关闭</button>
      <button onclick="closeModal();showEditCustomerModal('${id}')" class="btn-primary">编辑客户</button>`, 'xl');
+}
+
+// ==================== 批量操作 ====================
+function onCustomerCheckChange(id, checked) {
+  if (checked) { if (!customerSelected.includes(id)) customerSelected.push(id); }
+  else { customerSelected = customerSelected.filter(x => x !== id); }
+  refreshBatchCustomerBtn();
+}
+
+function toggleCustomerSelectAll(master) {
+  if (master.checked) {
+    const db = window.APP.db;
+    let list = [...(db.customers||[])].sort((a,b)=>b.createdAt-a.createdAt);
+    if (customerFilter !== 'all') list = list.filter(c=>c.type===customerFilter);
+    if (customerKeyword) list = filterList(list, customerKeyword, ['wechatName','wechatId','phone','name']);
+    customerSelected = list.map(c=>c.id);
+  } else { customerSelected = []; }
+  document.querySelectorAll('.cust-cb').forEach(cb=>{ cb.checked = master.checked; });
+  refreshBatchCustomerBtn();
+}
+
+function refreshBatchCustomerBtn() {
+  const btns = document.querySelectorAll('#page-customers .page-header [onclick]');
+  btns.forEach(btn=>{
+    if (btn.textContent.includes('批量删除')) {
+      btn.disabled = customerSelected.length===0;
+      btn.style.opacity = customerSelected.length===0?'0.5':'1';
+      btn.textContent = `批量删除 (${customerSelected.length})`;
+    }
+  });
+}
+
+function batchDeleteCustomers() {
+  if (customerSelected.length===0){showToast('请先选择客户','error');return;}
+  confirmDialog(`确定批量删除选中的 <b>${customerSelected.length}</b> 个客户吗？<br><small style="color:#94a3b8">关联订单不会被删除</small>`,function(){
+    const db=window.APP.db;
+    db.customers = db.customers.filter(c=>!customerSelected.includes(c.id));
+    saveDB();
+    customerSelected=[];
+    showToast('批量删除完成');
+    renderCustomers();
+  },'批量删除客户');
 }
