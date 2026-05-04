@@ -1,19 +1,41 @@
 /**
- * 订单管理.js - 销售客户管理系统 v3.3.0
+ * 订单管理.js - 销售客户管理系统 v3.3.1
  * 职责：订单列表、新增/编辑/删除/详情、软件+硬件订单
  * 调整：1.软件列表卡密+剩余时长独立列（不在产品名下）2.购买日期精确到时分秒
  *       3.微信号列移出订单列表（腾空间给卡密列）4.所有列表页显示序号
  *       5.工作台统计卡片点击跳转明细 6.商品客户展示页显示商品类型
  *       7.数据统计明细表格显示序号 8.订单类型切换字段完全同步
+ *       9.修复旧订单卡密显示为空（cardId反查卡密库，一次性回填cardCode）
  */
 
 let orderPage = 1;
 let orderFilter = 'all';
 let orderKeyword = '';
+let _orderCardCodeBackfilled = false;
+
+// 一次性回填：有 cardId 但无 cardCode 的旧订单，从卡密库补全 cardCode
+function backfillOrderCardCode() {
+  if (_orderCardCodeBackfilled) return;
+  _orderCardCodeBackfilled = true;
+  const db = window.APP.db;
+  if (!db || !db.orders) return;
+  let changed = false;
+  (db.orders || []).forEach(o => {
+    if (o.type === 'software' && o.cardId && !o.cardCode) {
+      const card = (db.cards || []).find(c => c.id === o.cardId);
+      if (card && card.cardCode) {
+        o.cardCode = card.cardCode;
+        changed = true;
+      }
+    }
+  });
+  if (changed) { saveDB(); showToast('已自动补全旧订单卡密信息', 'success'); }
+}
 
 function renderOrders() {
   const el = document.getElementById('page-orders');
   if (!el) return;
+  backfillOrderCardCode(); // 补全旧订单 cardCode
 
   const db = window.APP.db;
   let list = [...(db.orders || [])].sort((a, b) => b.createdAt - a.createdAt);
@@ -72,8 +94,17 @@ function renderOrders() {
               pager.items.map((o, idx) => {
                 const pName = o.productName || '-';
                 // 软件订单：卡密（点击可复制）
-                const cardCell = o.type === 'software' && o.cardCode
-                  ? `<span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制卡密" onclick="copyToClipboard('${o.cardCode.replace(/'/g,"\\'")}','卡密已复制')">${o.cardCode}</span>`
+                // 优先用 order 上存的 cardCode；旧订单只有 cardId 时反查卡密库
+                let displayCardCode = '';
+                if (o.type === 'software') {
+                  displayCardCode = o.cardCode || '';
+                  if (!displayCardCode && o.cardId) {
+                    const card = (window.APP.db.cards || []).find(c => c.id === o.cardId);
+                    displayCardCode = card ? card.cardCode : '';
+                  }
+                }
+                const cardCell = o.type === 'software' && displayCardCode
+                  ? `<span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制卡密" onclick="copyToClipboard('${displayCardCode.replace(/'/g,"\\'")}','卡密已复制')">${displayCardCode}</span>`
                   : '-';
                 // 软件订单：分类标签；硬件订单：快递公司
                 const extraCol = o.type === 'hardware'
