@@ -29,8 +29,8 @@ function renderDashboard() {
   const hardwareOrders = orders.filter(o => o.type === 'hardware').length;
 
   // 新增：商品管理/产品销售统计
-  const totalProducts = products.length;
-  const onSaleCount = (db.productSalesData ? Object.values(db.productSalesData).filter(s => s.status === 'on_sale').length : 0);
+  const totalProducts = (db.products || []).length;
+  const onSaleCount = (db.productSalesData ? Object.values(db.productSalesData).filter(s => s.status === 'active').length : 0);
 
   // 即将到期（30天内）
   const expiringSoon = orders.filter(o => {
