@@ -836,9 +836,13 @@ function navigateTo(page) {
     orders: typeof renderOrders === 'function' ? renderOrders : null,
     cards: typeof renderCards === 'function' ? renderCards : null,
     products: typeof renderProducts === 'function' ? renderProducts : null,
+    'product-sales': typeof renderProductSales === 'function' ? renderProductSales : null,
     stats: typeof renderStats === 'function' ? renderStats : null,
     settings: typeof renderSettings === 'function' ? renderSettings : null
   };
+  // 特殊处理：软件/硬件订单先设置过滤器再渲染
+  if (page === 'orders-software') { if(typeof setOrderFilterAndRender==='function') setOrderFilterAndRender('software'); return; }
+  if (page === 'orders-hardware') { if(typeof setOrderFilterAndRender==='function') setOrderFilterAndRender('hardware'); return; }
   const fn = renderMap[page];
   if (fn) fn();
 }

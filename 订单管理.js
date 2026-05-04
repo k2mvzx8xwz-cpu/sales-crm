@@ -14,6 +14,13 @@ let orderKeyword = '';
 let _orderCardCodeBackfilled = false;
 let orderSelected = [];
 
+// 供 navigateTo 调用，切换软件/硬件订单页时先设过滤条件
+function setOrderFilterAndRender(filter) {
+  orderFilter = filter;
+  orderPage = 1;
+  renderOrders();
+}
+
 // 一次性回填：有 cardId 但无 cardCode 的旧订单，从卡密库补全 cardCode
 function backfillOrderCardCode() {
   if (_orderCardCodeBackfilled) return;
