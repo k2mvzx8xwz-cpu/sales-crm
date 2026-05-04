@@ -973,6 +973,10 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
     font-size: 12px;
     min-width: 600px;
   }
+  /* 订单管理表格列较多，加宽最小宽度 */
+  #page-orders .data-table {
+    min-width: 900px;
+  }
   .data-table th,
   .data-table td {
     padding: 8px 8px;

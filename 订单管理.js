@@ -62,9 +62,8 @@ function renderOrders() {
               <!-- 硬件列 -->
               <th class="hw-col" style="display:none">快递公司</th>
               <th>购买日期</th>
-              <!-- 软件列 -->
-              <th class="sw-col">有效期至</th>
-              <th class="sw-col">剩余时间</th>
+              <th>有效期至</th>
+              <th>剩余时间</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -102,8 +101,8 @@ function renderOrders() {
                   <td class="sw-col">${extraCol}</td>
                   <td class="hw-col" style="display:none">${extraCol}</td>
                   <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
-                  <td class="sw-col" style="white-space:nowrap;font-size:12px;">${expireCell}</td>
-                  <td class="sw-col" style="white-space:nowrap;">${remainCell}</td>
+                  <td style="white-space:nowrap;font-size:12px;">${expireCell}</td>
+                  <td style="white-space:nowrap;">${remainCell}</td>
                   <td class="action-cell">
                     <button class="btn-xs btn-primary" onclick="showOrderDetail('${o.id}')">详情</button>
                     <button class="btn-xs btn-secondary" onclick="showEditOrderModal('${o.id}')">编辑</button>
