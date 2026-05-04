@@ -15,7 +15,6 @@ function renderProducts() {
       <button class="btn-primary" onclick="showAddProductModal()">+ 新增商品</button>
     </div>
     <div class="section-card">
-      <div class="section-card-header"><span>💾 真实数据（与系统同步，用于成本利润计算）</span></div>
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr><th>序号</th><th>商品名称</th><th>类型</th><th>售价</th><th>成本</th><th>利润</th><th>备注</th><th>操作</th></tr></thead>
