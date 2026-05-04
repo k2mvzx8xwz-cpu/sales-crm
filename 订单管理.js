@@ -48,6 +48,7 @@ function renderOrders() {
           <thead>
             <tr>
               <th>序号</th>
+              <th>订单号</th>
               <th>微信昵称</th>
               <th>产品名称</th>
               <!-- 软件列 -->
@@ -61,6 +62,9 @@ function renderOrders() {
               <!-- 硬件列 -->
               <th class="hw-col" style="display:none">快递公司</th>
               <th>购买日期</th>
+              <!-- 软件列 -->
+              <th class="sw-col">有效期至</th>
+              <th class="sw-col">剩余时间</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -68,12 +72,9 @@ function renderOrders() {
             ${pager.items.length === 0 ? `<tr><td colspan="10" class="empty-cell">暂无订单数据</td></tr>` :
               pager.items.map((o, idx) => {
                 const pName = o.productName || '-';
-                // 软件订单：卡密+剩余时长（并排显示在同一单元格内）
+                // 软件订单：卡密（点击可复制）
                 const cardCell = o.type === 'software' && o.cardCode
-                  ? `<div style="display:flex;flex-direction:column;gap:2px;">
-                       <span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制卡密" onclick="copyToClipboard('${o.cardCode.replace(/'/g,"\\'")}','卡密已复制')">${o.cardCode}</span>
-                       ${o.expireDate ? `<span style="font-size:11px;">${formatRemainingTime(o.expireDate)}</span>` : ''}
-                     </div>`
+                  ? `<span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制卡密" onclick="copyToClipboard('${o.cardCode.replace(/'/g,"\\'")}','卡密已复制')">${o.cardCode}</span>`
                   : '-';
                 // 软件订单：分类标签；硬件订单：快递公司
                 const extraCol = o.type === 'hardware'
@@ -82,8 +83,16 @@ function renderOrders() {
                 // 购买日期精确到时分秒
                 const dateStr = formatDate(new Date(o.orderDate||o.createdAt),'YYYY-MM-DD HH:mm:ss');
                 const rowClass = o.type === 'hardware' ? 'hw-order-row' : 'sw-order-row';
+                // 有效期至 / 剩余时间（仅软件订单）
+                const expireCell = o.type === 'software'
+                  ? (o.expireDate || '-')
+                  : '-';
+                const remainCell = o.type === 'software' && o.expireDate
+                  ? formatRemainingTime(o.expireDate)
+                  : '-';
                 return `<tr class="${rowClass}">
                   <td>${(orderPage-1)*15+idx+1}</td>
+                  <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td>${o.wechatName||'-'}</td>
                   <td style="white-space:normal;word-break:break-all;min-width:160px;max-width:220px;">${pName}</td>
                   <td class="sw-col" style="white-space:nowrap;">${cardCell}</td>
@@ -93,6 +102,8 @@ function renderOrders() {
                   <td class="sw-col">${extraCol}</td>
                   <td class="hw-col" style="display:none">${extraCol}</td>
                   <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
+                  <td class="sw-col" style="white-space:nowrap;font-size:12px;">${expireCell}</td>
+                  <td class="sw-col" style="white-space:nowrap;">${remainCell}</td>
                   <td class="action-cell">
                     <button class="btn-xs btn-primary" onclick="showOrderDetail('${o.id}')">详情</button>
                     <button class="btn-xs btn-secondary" onclick="showEditOrderModal('${o.id}')">编辑</button>

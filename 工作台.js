@@ -131,9 +131,9 @@ function renderDashboard() {
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>序号</th><th>类型</th><th>产品</th><th>客户</th><th>金额</th><th>到期时间</th><th>剩余时间</th><th>操作</th></tr></thead>
+          <thead><tr><th>序号</th><th>订单号</th><th>类型</th><th>产品</th><th>客户</th><th>金额</th><th>到期时间</th><th>剩余时间</th><th>操作</th></tr></thead>
           <tbody>
-            ${recentOrders.length === 0 ? `<tr><td colspan="8" class="empty-cell">暂无订单数据</td></tr>` :
+            ${recentOrders.length === 0 ? `<tr><td colspan="9" class="empty-cell">暂无订单数据</td></tr>` :
               recentOrders.map((o, idx) => {
                 const isSoft = o.type === 'software';
                 const days = isSoft ? calcRemainingDays(o.expireDate) : null;
@@ -147,6 +147,7 @@ function renderDashboard() {
                 return `
                 <tr>
                   <td>${idx+1}</td>
+                  <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td><span class="badge ${isSoft ? 'badge-blue' : 'badge-green'}">${isSoft ? '软件' : '硬件'}</span></td>
                   <td style="white-space:normal;word-break:break-all;max-width:140px;">${o.productName || '-'}</td>
                   <td>${o.wechatName || o.customerName || '-'}</td>
