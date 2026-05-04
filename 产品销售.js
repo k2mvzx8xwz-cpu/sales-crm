@@ -108,7 +108,9 @@ function renderSalesTab(list, pager) {
       <div id="ps-pager"></div>
     </div>
   `;
-}(list) {
+}
+
+function renderDisplayTab(list) {
   const db = window.APP.db;
   const displayData = db.productDisplayData || {};
 

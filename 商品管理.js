@@ -143,7 +143,6 @@ function deleteProduct(id, silent = false) {
   } else {
     confirmDialog(`确定删除商品「${p.name}」吗？<br><small style="color:#94a3b8">不影响已创建的订单</small>`, doDelete, '删除商品');
   }
-  }, '删除商品');
 }
 
 
