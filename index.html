@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>销售客户管理系统</title>
-  <link rel="stylesheet" href="style.css?v=202605051120">
+  <link rel="stylesheet" href="style.css?v=202605052209">
 </head>
 <body>
 <div class="app-layout">
@@ -19,7 +19,21 @@
       </svg>
     </button>
     <div class="mobile-header-title" id="mobile-header-title">工作台</div>
-    <button onclick="cycleTheme()" title="切换主题" class="mobile-theme-btn" aria-label="切换主题" id="theme-toggle-icon">🌙</button>
+    <!-- 同步按钮 -->
+    <button onclick="syncNow()" title="同步数据" class="mobile-header-btn" aria-label="同步数据" id="mobile-sync-top-btn">
+      <svg id="sync-icon-top" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+    </button>
+    <!-- 齿轮设置按钮 -->
+    <button onclick="navigateTo('settings')" title="系统设置" class="mobile-header-btn" aria-label="系统设置">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
   </header>
 
   <!-- 侧边栏遮罩层（移动端） -->
@@ -99,66 +113,45 @@
   </main>
 </div>
 
-<!-- 移动端底部导航（横向滚动单排，单字标注） -->
+<!-- 移动端底部导航（横向滚动单排，两字标注，6项精简版） -->
 <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
   <div class="mobile-nav-item" data-page="dashboard" onclick="navigateTo('dashboard')">
     <span class="mobile-nav-icon">🏠</span>
-    <span>工</span>
+    <span>工作台</span>
   </div>
   <div class="mobile-nav-item" data-page="customers" onclick="navigateTo('customers')">
     <span class="mobile-nav-icon">👥</span>
-    <span>客</span>
-  </div>
-  <div class="mobile-nav-item" data-page="orders" onclick="navigateTo('orders')">
-    <span class="mobile-nav-icon">📋</span>
-    <span>订</span>
+    <span>客户</span>
   </div>
   <div class="mobile-nav-item" data-page="orders-software" onclick="navigateTo('orders-software')">
     <span class="mobile-nav-icon">💾</span>
-    <span>软</span>
+    <span>软件</span>
   </div>
   <div class="mobile-nav-item" data-page="orders-hardware" onclick="navigateTo('orders-hardware')">
     <span class="mobile-nav-icon">💻</span>
-    <span>硬</span>
+    <span>硬件</span>
   </div>
   <div class="mobile-nav-item" data-page="cards" onclick="navigateTo('cards')">
     <span class="mobile-nav-icon">🔑</span>
-    <span>卡</span>
+    <span>卡密</span>
   </div>
-  <div class="mobile-nav-item" data-page="products" onclick="navigateTo('products')">
-    <span class="mobile-nav-icon">📦</span>
-    <span>商</span>
-  </div>
-  <div class="mobile-nav-item" data-page="product-sales" onclick="navigateTo('product-sales')">
-    <span class="mobile-nav-icon">📊</span>
-    <span>销</span>
-  </div>
-  <div class="mobile-nav-item" data-page="settings" onclick="navigateTo('settings')">
-    <span class="mobile-nav-icon">⚙️</span>
-    <span>设</span>
+  <div class="mobile-nav-item" data-page="stats" onclick="navigateTo('stats')">
+    <span class="mobile-nav-icon">📈</span>
+    <span>统计</span>
   </div>
 </nav>
 
-<!-- 手机端悬浮同步按钮 -->
-<button onclick="syncNow()" title="立即同步" class="mobile-sync-btn" id="mobile-sync-btn">
-  <svg id="sync-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="23 4 23 10 17 10"></polyline>
-    <polyline points="1 20 1 14 7 14"></polyline>
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-  </svg>
-</button>
-
 <!-- JS模块加载（顺序很重要） -->
-<script src="核心工具.js?v=202605050800"></script>
-<script src="工作台.js?v=202605050800"></script>
-<script src="客户管理.js?v=202605050800"></script>
-<script src="订单管理.js?v=202605050800"></script>
-<script src="卡密库.js?v=202605050800"></script>
-<script src="商品管理.js?v=202605050800"></script>
-<script src="产品销售.js?v=202605050800"></script>
-<script src="数据统计.js?v=202605050800"></script>
-<script src="系统设置.js?v=202605051120"></script>
-<script src="扩展功能.js?v=202605050800"></script>
+<script src="核心工具.js?v=202605052209"></script>
+<script src="工作台.js?v=202605052209"></script>
+<script src="客户管理.js?v=202605052209"></script>
+<script src="订单管理.js?v=202605052209"></script>
+<script src="卡密库.js?v=202605052209"></script>
+<script src="商品管理.js?v=202605052209"></script>
+<script src="产品销售.js?v=202605052209"></script>
+<script src="数据统计.js?v=202605052209"></script>
+<script src="系统设置.js?v=202605052209"></script>
+<script src="扩展功能.js?v=202605052209"></script>
 
 <script>
 // 移动端菜单控制
