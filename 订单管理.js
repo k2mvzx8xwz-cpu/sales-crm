@@ -726,8 +726,31 @@ function selectCustomerByObj(id) {
   // 备选：直接从数据库找
   if (!c) c = db.customers.find(x => String(x.id) === String(id));
   if (!c) { showToast('客户未找到，可能已被删除', 'error'); return; }
-  document.getElementById('of-customerSearch').value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
-  document.getElementById('of-customerId').value = String(c.id);
+
+  // 检查表单字段是否存在，不存在则重新渲染
+  const searchField = document.getElementById('of-customerSearch');
+  const idField = document.getElementById('of-customerId');
+  if (!searchField || !idField) {
+    // 表单丢失，强制重新渲染新增订单表单
+    console.log('[选择器] 表单字段丢失，强制重新渲染...');
+    // 暂存客户对象
+    window._pendingCustomerObj = c;
+    window._pendingCustomerId = String(c.id);
+    showNewOrderForm({ type: window.APP._currentOrderType || 'software' });
+    // 重新获取字段
+    const s2 = document.getElementById('of-customerSearch');
+    const i2 = document.getElementById('of-customerId');
+    if (s2) s2.value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
+    if (i2) i2.value = String(c.id);
+    window._pendingCustomerId = null;
+    window._pendingCustomerObj = null;
+    showToast(`已选择客户：${c.wechatName || c.wechatId || '未知'}`, 'success');
+    return;
+  }
+
+  // 正常路径：填入表单
+  searchField.value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
+  idField.value = String(c.id);
   window._pendingCustomerId = null;
   window._pendingCustomerObj = null;
   closeModal();
