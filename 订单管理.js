@@ -60,11 +60,9 @@ function renderOrders() {
     : '订单管理';
   const showFilterBar = viewMode === 'all'; // 只有从订单管理进入才显示全部/软件/硬件标签
 
-  // 根据当前筛选决定列显示（显式控制，必须用display:table-cell覆盖CSS的display:none）
-  const isSoftware = orderFilter === 'software';
-  const isHardware = orderFilter === 'hardware';
-  const swColStyle = isSoftware ? 'display:table-cell' : 'display:none';
-  const hwColStyle = isHardware ? 'display:table-cell' : 'display:none';
+  // 根据当前筛选决定列显示：给swColStyle/hwColStyle统一加分号，确保拼接其他style时不产生无效CSS
+  const swColStyle = (orderFilter === 'software') ? 'display:table-cell;' : 'display:none;';
+  const hwColStyle = (orderFilter === 'hardware') ? 'display:table-cell;' : 'display:none;';
 
   el.innerHTML = `
     <div class="page-header">
@@ -153,7 +151,7 @@ function renderOrders() {
                   <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td>${o.wechatName||'-'}</td>
                   <td style="white-space:normal;word-break:break-all;min-width:160px;max-width:220px;">${pName}</td>
-                  <td class="sw-col" style="${swColStyle} white-space:nowrap;">${cardCell}</td>
+                  <td class="sw-col" style="${swColStyle}white-space:nowrap;">${cardCell}</td>
                   <td class="hw-col" style="${hwColStyle}">${o.portType ? `<span class="badge badge-gray">${o.portType}口</span>` : '-'}</td>
                   <td>¥${formatMoney(o.totalAmount)}</td>
                   <td>${o.qty||1}</td>

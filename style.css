@@ -363,20 +363,7 @@ body {
   background: #1a2140;
 }
 
-/* ==================== 订单列表软件/硬件列条件显示（v3.3）==================== */
-/* 默认：硬件列显示，软件列隐藏；激活软件筛选时反过来 */
-.data-table th.sw-col,
-.data-table td.sw-col { display: none; }
-.data-table th.hw-col,
-.data-table td.hw-col { }
-
-/* 软件筛选时：显示软件列，隐藏硬件列 */
-.data-table.filter-software th.sw-col,
-.data-table.filter-software td.sw-col { display: table-cell; }
-.data-table.filter-software th.hw-col,
-.data-table.filter-software td.hw-col { display: none; }
-
-/* 硬件筛选时：硬件列已默认显示，无需额外规则 */
+/* ==================== 订单列表软件/硬件列：由JS inline style控制 ==================== */
 
 /* 序号列固定宽度 */
 .data-table th:first-child,
