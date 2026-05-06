@@ -61,9 +61,11 @@ function renderOrders() {
   const showFilterBar = viewMode === 'all'; // 只有从订单管理进入才显示全部/软件/硬件标签
 
   // 根据当前筛选决定列显示（显式控制，不用依赖CSS默认值）
-  // 显示软件列：display:table-cell；隐藏：display:none
-  const swColStyle = isSoftware ? '' : (isHardware ? 'display:none' : '');
-  const hwColStyle = isHardware ? '' : (isSoftware ? 'display:none' : '');
+  // 显示软件列：inline style为空（覆盖CSS的display:none）；隐藏：display:none
+  const isSoftware = orderFilter === 'software';
+  const isHardware = orderFilter === 'hardware';
+  const swColStyle = isSoftware ? '' : 'display:none';
+  const hwColStyle = isHardware ? '' : 'display:none';
 
   el.innerHTML = `
     <div class="page-header">
