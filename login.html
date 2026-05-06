@@ -74,13 +74,19 @@
   .btn-login:hover { opacity: 0.9; }
   .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
   .login-links {
-    display: flex; justify-content: space-between;
+    display: flex; justify-content: space-between; align-items: center;
     margin-top: 16px; font-size: 13px;
   }
   .login-links a {
     color: #60a5fa; text-decoration: none;
   }
   .login-links a:hover { text-decoration: underline; }
+  .remember-me-wrap {
+    display: flex; align-items: center; gap: 6px;
+    color: #94a3b8; font-size: 13px; cursor: pointer;
+    user-select: none;
+  }
+  .remember-me-wrap input { cursor: pointer; accent-color: #3b82f6; }
   .login-error {
     background: rgba(239,68,68,0.15);
     border: 1px solid rgba(239,68,68,0.3);
@@ -132,6 +138,9 @@
     <button type="submit" class="btn-login" id="login-btn">登  录</button>
   </form>
   <div class="login-links">
+    <label class="remember-me-wrap">
+      <input type="checkbox" id="remember-me"> 记住登录状态
+    </label>
     <a onclick="showRecover()">忘记密码？</a>
   </div>
 </div>
@@ -224,10 +233,14 @@ function doLogin() {
   }
 
   // 登录成功：写入会话
-  localStorage.setItem('auth_session', JSON.stringify({
+  const remember = document.getElementById('remember-me').checked;
+  const expiresIn = remember ? 30 * 24 * 60 * 60 * 1000 : 0; // 记住=30天，否则=会话结束
+  const session = {
     username: user.username,
-    loggedInAt: Date.now()
-  }));
+    loggedInAt: Date.now(),
+    expiresAt: expiresIn > 0 ? Date.now() + expiresIn : 0  // 0=会话结束
+  };
+  localStorage.setItem('auth_session', JSON.stringify(session));
 
   btn.textContent = '登录成功，跳转中...';
   btn.disabled = true;

@@ -8,12 +8,14 @@
 </head>
 <body>
 <script>
-// 登录认证检查：未登录则跳转到 login.html
+// 登录认证检查：未登录或会话过期则跳转 login.html（含自动登录）
 (function() {
   try {
     const session = JSON.parse(localStorage.getItem('auth_session') || 'null');
-    if (!session || !session.username) {
-      // 保存当前页面路径，登录后跳转回来
+    // 检查会话存在、用户名存在、且未过期（expiresAt=0表示永久记住，>0则需校验）
+    const valid = session && session.username &&
+      (session.expiresAt === 0 || session.expiresAt > Date.now());
+    if (!valid) {
       sessionStorage.setItem('auth_redirect', location.pathname.replace(/^.*\//, ''));
       location.href = 'login.html?v=' + Date.now();
     }
@@ -166,16 +168,16 @@
 </nav>
 
 <!-- JS模块加载 -->
-<script src="核心工具.js?v=202605061500"></script>
-<script src="工作台.js?v=202605061500"></script>
-<script src="客户管理.js?v=202605061500"></script>
-<script src="订单管理.js?v=202605061500"></script>
-<script src="卡密库.js?v=202605061500"></script>
-<script src="商品管理.js?v=202605061500"></script>
-<script src="产品销售.js?v=202605061500"></script>
-<script src="数据统计.js?v=202605061500"></script>
-<script src="系统设置.js?v=202605061500"></script>
-<script src="扩展功能.js?v=202605061500"></script>
+<script src="核心工具.js?v=202605061530"></script>
+<script src="工作台.js?v=202605061530"></script>
+<script src="客户管理.js?v=202605061530"></script>
+<script src="订单管理.js?v=202605061530"></script>
+<script src="卡密库.js?v=202605061530"></script>
+<script src="商品管理.js?v=202605061530"></script>
+<script src="产品销售.js?v=202605061530"></script>
+<script src="数据统计.js?v=202605061530"></script>
+<script src="系统设置.js?v=202605061530"></script>
+<script src="扩展功能.js?v=202605061530"></script>
 
 <script>
 function toggleMobileMenu() {
