@@ -630,7 +630,8 @@ function showCustomerPicker() {
     </div>
     <div id="customer-picker-list" style="max-height:380px;overflow-y:auto;"></div>
   `;
-  showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button>`);
+  showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button><button onclick="confirmCustomerSelection()" class="btn-primary" style="margin-left:8px">确定</button>`);
+  window._pendingCustomerId = null;
   setTimeout(() => renderCustomerPickerList(document.querySelector('[data-type="all"]')), 50);
 }
 
@@ -648,15 +649,31 @@ function renderCustomerPickerList(btn) {
   container.innerHTML = list.length === 0
     ? '<div class="empty-cell">暂无客户</div>'
     : list.map((c, idx) => `
-        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;"
-             onclick="selectCustomerForOrder('${c.id}')"
-             onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;transition:background 0.15s;"
+             onclick="previewCustomerForOrder('${c.id}',this)"
+             ondblclick="selectCustomerForOrder('${c.id}')"
+             onmouseover="this.style.background='var(--bg-hover)'" onmouseout="if(!this.dataset.selected)this.style.background=''">
           <span style="font-size:12px;color:var(--text-muted);min-width:28px;text-align:center;">${idx+1}</span>
           <span class="badge ${c.type==='software'?'badge-blue':'badge-green'}">${c.type==='software'?'软件':'硬件'}</span>
           <span style="flex:1;color:var(--text-primary);">${c.wechatName||''} ${c.wechatId?'('+c.wechatId+')':''}</span>
           <span style="font-size:12px;color:var(--text-muted);">${c.phone||''}</span>
         </div>
       `).join('');
+}
+
+// 预览客户（单选高亮）
+function previewCustomerForOrder(id, el) {
+  document.querySelectorAll('#customer-picker-list > div').forEach(d => { d.style.background = ''; delete d.dataset.selected; });
+  el.style.background = 'var(--bg-hover)';
+  el.dataset.selected = 'true';
+  window._pendingCustomerId = id;
+}
+
+// 确认选择客户
+function confirmCustomerSelection() {
+  const id = window._pendingCustomerId;
+  if (!id) { showToast('请先选择一个客户', 'warning'); return; }
+  selectCustomerForOrder(id);
 }
 
 function selectCustomerForOrder(id) {
@@ -666,6 +683,7 @@ function selectCustomerForOrder(id) {
   if (!c) return;
   document.getElementById('of-customerSearch').value = `${c.wechatName}${c.wechatId?' ('+c.wechatId+')':''}`;
   document.getElementById('of-customerId').value = id;
+  window._pendingCustomerId = null;
   closeModal();
   onCustomerChange(id);
 }
@@ -843,11 +861,20 @@ function selectCard(id, code, category, expireDate) {
   if (display) display.style.display = 'flex';
   if (text) text.textContent = code;
 
+  // 设置分类（触发自动计算有效期）
   if (category) {
     const catEl = document.getElementById('of-cardCategory');
     if (catEl) catEl.value = category;
-  }
-  if (expireDate) {
+    // 如果卡密库有有效期则用卡密的；否则按分类+订单日期自动计算
+    if (expireDate) {
+      const expEl = document.getElementById('of-expireDate');
+      if (expEl) expEl.value = expireDate;
+    } else {
+      // 无有效期，按分类+当前订单日期计算
+      onCardCategoryChange();
+    }
+  } else if (expireDate) {
+    // 有有效期但无分类，只填有效期
     const expEl = document.getElementById('of-expireDate');
     if (expEl) expEl.value = expireDate;
   }
@@ -990,7 +1017,7 @@ function saveOrder(editId = null) {
     order.deviceHistory = [];
     db.orders.push(order);
 
-    // 更新卡密状态
+    // 更新卡密状态（保存购买时间/添加时间/有效期/剩余时间）
     if (cardId) {
       const card = db.cards.find(c => c.id === cardId);
       if (card) {
@@ -998,6 +1025,15 @@ function saveOrder(editId = null) {
         card.relatedOrderNo = order.orderNo;
         card.relatedWechatName = customer.wechatName;
         card.relatedWechatId = customer.wechatId || '';
+        // 保存购买时间和有效期
+        card.buyDate = orderDate;  // 购买时间
+        card.expireDate = order.expireDate;  // 有效期至
+        card.addedTime = getFullDatetime();  // 添加时间
+        // 计算剩余时间
+        if (order.expireDate) {
+          const days = calcRemainingDays(order.expireDate);
+          card.remainingDays = days !== null ? days : null;
+        }
       }
     }
 
