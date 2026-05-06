@@ -46,9 +46,20 @@ function renderDashboard() {
   if (!el) return;
 
   el.innerHTML = `
-    <div class="page-header">
-      <h2 class="page-title">工作台</h2>
-      <span class="page-subtitle">欢迎使用销售客户管理系统</span>
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div>
+        <h2 class="page-title" style="margin:0;">工作台</h2>
+        <span class="page-subtitle">欢迎使用销售客户管理系统</span>
+      </div>
+      <button onclick="navigateTo('settings')" title="系统设置"
+        style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-secondary);cursor:pointer;color:var(--text-secondary);transition:all 0.2s;flex-shrink:0;"
+        onmouseover="this.style.background='var(--bg-hover)';this.style.color='var(--accent)'"
+        onmouseout="this.style.background='var(--bg-secondary)';this.style.color='var(--text-secondary)'">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
     </div>
 
     <!-- 统计卡片（调整：全部可点击跳转） -->
