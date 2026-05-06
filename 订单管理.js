@@ -107,6 +107,7 @@ function renderOrders() {
               <th>数量</th>
               <th class="sw-col" style="${swColStyle}">分类</th>
               <th class="hw-col" style="${hwColStyle}">快递公司</th>
+              <th class="hw-col" style="${hwColStyle}">物流单号</th>
               <th>购买日期</th>
               <th class="sw-col" style="${swColStyle}">有效期至</th>
               <th class="sw-col" style="${swColStyle}">剩余时间</th>
@@ -114,7 +115,7 @@ function renderOrders() {
             </tr>
           </thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="15" class="empty-cell">暂无订单数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="16" class="empty-cell">暂无订单数据</td></tr>` :
               pager.items.map((o, idx) => {
                 const isChecked = orderSelected.includes(o.id);
                 const pName = o.productName || '-';
@@ -157,6 +158,7 @@ function renderOrders() {
                   <td>${o.qty||1}</td>
                   <td class="sw-col" style="${swColStyle}">${extraCol}</td>
                   <td class="hw-col" style="${hwColStyle}">${extraCol}</td>
+                  <td class="hw-col" style="${hwColStyle}">${o.trackingNo ? `<span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制物流单号" onclick="copyToClipboard('${(o.trackingNo||'').replace(/'/g,"\\'")}','物流单号已复制')">${o.trackingNo}</span>` : '-'}</td>
                   <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
                   <td class="sw-col" style="${swColStyle} white-space:nowrap;font-size:12px;">${expireCell}</td>
                   <td class="sw-col" style="${swColStyle} white-space:nowrap;">${remainCell}</td>
