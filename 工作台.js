@@ -213,28 +213,5 @@ function renderDashboard() {
       </div>
     </div>
 
-    <!-- 产品销售快捷入口（移动端工作台展示） -->
-    <div class="section-card" style="margin-top:16px;">
-      <div class="section-card-header">
-        <span>📊 产品销售</span>
-        <button class="btn-xs btn-primary" onclick="navigateTo('product-sales')">进入管理 →</button>
-      </div>
-      <div style="padding:12px 0 4px;display:flex;gap:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:14px 16px;text-align:center;cursor:pointer;" onclick="navigateTo('product-sales')">
-          <div style="font-size:28px;margin-bottom:4px;">📦</div>
-          <div style="font-size:22px;font-weight:700;color:var(--text-primary);">${totalProducts}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">商品总数</div>
-        </div>
-        <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:14px 16px;text-align:center;cursor:pointer;" onclick="navigateTo('product-sales')">
-          <div style="font-size:28px;margin-bottom:4px;">✅</div>
-          <div style="font-size:22px;font-weight:700;color:var(--accent);">${onSaleCount}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">已上架</div>
-        </div>
-        <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:14px 16px;text-align:center;cursor:pointer;" onclick="navigateTo('products')">
-          <div style="font-size:28px;margin-bottom:4px;">⚙️</div>
-          <div style="font-size:14px;font-weight:600;color:var(--text-secondary);margin-top:8px;">商品管理</div>
-        </div>
-      </div>
-    </div>
   `;
 }
