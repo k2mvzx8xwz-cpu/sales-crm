@@ -622,7 +622,7 @@ function onCustomerChange(customerId) {
   if (c.type === 'hardware') fillFromCustomerAddress();
 }
 
-// ==================== 客户选择器（任务3） ====================
+// ==================== 客户选择器 ====================
 function showCustomerPicker() {
   const content = `
     <div class="filter-tabs" style="margin-bottom:12px;">
@@ -636,14 +636,18 @@ function showCustomerPicker() {
   `;
   showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button><button onclick="confirmCustomerSelection()" class="btn-primary" style="margin-left:8px">确定</button>`);
   window._pendingCustomerId = null;
+  window._pendingCustomerObj = null;
   // 等待数据库就绪后渲染
   let attempts = 0;
   function tryRender() {
     attempts++;
-    if (window.APP && window.APP.db) {
+    if (window.APP && window.APP.db && window.APP.db.customers) {
       renderCustomerPickerList(document.querySelector('[data-type="all"]'));
     } else if (attempts < 30) {
       setTimeout(tryRender, 100);
+    } else {
+      const container = document.getElementById('customer-picker-list');
+      if (container) container.innerHTML = '<div class="empty-cell">数据加载失败，请刷新重试</div>';
     }
   }
   setTimeout(tryRender, 50);
@@ -663,9 +667,10 @@ function renderCustomerPickerList(btn) {
   container.innerHTML = list.length === 0
     ? '<div class="empty-cell">暂无客户</div>'
     : list.map((c, idx) => `
-        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;transition:background 0.15s;"
-             onclick="previewCustomerForOrder('${c.id}',this)"
-             ondblclick="selectCustomerForOrder('${c.id}')"
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;"
+             data-cid="${String(c.id)}"
+             onclick="onPickerItemClick(this, '${String(c.id).replace(/'/g, "\\'")}', ${idx})"
+             ondblclick="onPickerDblClick('${String(c.id).replace(/'/g, "\\'")}')"
              onmouseover="this.style.background='var(--bg-hover)'" onmouseout="if(!this.dataset.selected)this.style.background=''">
           <span style="font-size:12px;color:var(--text-muted);min-width:28px;text-align:center;">${idx+1}</span>
           <span class="badge ${c.type==='software'?'badge-blue':'badge-green'}">${c.type==='software'?'软件':'硬件'}</span>
@@ -675,39 +680,47 @@ function renderCustomerPickerList(btn) {
       `).join('');
 }
 
-// 预览客户（单选高亮）
-function previewCustomerForOrder(id, el) {
+// 单击：设置高亮和待选客户对象
+function onPickerItemClick(el, id, idx) {
   document.querySelectorAll('#customer-picker-list > div').forEach(d => { d.style.background = ''; delete d.dataset.selected; });
   el.style.background = 'var(--bg-hover)';
   el.dataset.selected = 'true';
-  window._pendingCustomerId = String(Number(id)); // 统一转为字符串数字
+  window._pendingCustomerId = id;
+  // 同时把整个客户对象存起来，避免再次查找
+  const db = window.APP && window.APP.db;
+  if (db) {
+    window._pendingCustomerObj = db.customers.find(c => String(c.id) === id) || null;
+  }
+}
+
+// 双击：直接选中
+function onPickerDblClick(id) {
+  selectCustomerByObj(id);
 }
 
 // 确认选择客户
 function confirmCustomerSelection() {
-  const id = window._pendingCustomerId;
-  if (!id) { showToast('请先在列表中点击选择一个客户', 'warning'); return; }
-  selectCustomerForOrder(id);
+  const obj = window._pendingCustomerObj;
+  if (!obj) { showToast('请先点击选择一个客户', 'warning'); return; }
+  selectCustomerByObj(window._pendingCustomerId);
 }
 
-function selectCustomerForOrder(id) {
+// 根据客户对象（而非ID）选中 - 最可靠的路径
+function selectCustomerByObj(id) {
   const db = window.APP && window.APP.db;
   if (!db) { showToast('数据未就绪，请重试', 'error'); return; }
-  // 调试：先尝试数字ID，再尝试字符串ID
-  const numericId = Number(id);
-  let c = db.customers.find(x => x.id === numericId);
+  if (!id) { showToast('未选中客户', 'error'); return; }
+  // 用已缓存的对象（最快路径）
+  let c = window._pendingCustomerObj;
+  // 备选：直接从数据库找
   if (!c) c = db.customers.find(x => String(x.id) === String(id));
-  // 调试弹窗：直接告诉用户问题在哪
-  if (!c) {
-    const allIds = (db.customers||[]).map(x=>({id:x.id, type:typeof x.id, name:x.wechatName}));
-    alert('调试信息：\n传入的ID=' + id + ' (类型:' + typeof id + ')\n转数字后=' + numericId + '\n\n数据库中的客户ID：\n' + allIds.slice(0,5).map(x=>x.id+' ('+x.type+') - '+x.name).join('\n'));
-    return;
-  }
+  if (!c) { showToast('客户未找到，可能已被删除', 'error'); return; }
   document.getElementById('of-customerSearch').value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
-  document.getElementById('of-customerId').value = String(numericId);
+  document.getElementById('of-customerId').value = String(c.id);
   window._pendingCustomerId = null;
+  window._pendingCustomerObj = null;
   closeModal();
-  onCustomerChange(String(numericId));
+  onCustomerChange(String(c.id));
   showToast(`已选择客户：${c.wechatName || c.wechatId || '未知'}`, 'success');
 }
 
