@@ -116,6 +116,36 @@
     display: inline-block; margin-bottom: 16px; cursor: pointer;
   }
   .back-link:hover { color: #e2e8f0; }
+  /* 移动端适配 */
+  @media screen and (max-width: 480px) {
+    body {
+      align-items: flex-start; /* 从顶部开始，不要完全居中 */
+      padding: 16px 0;
+      min-height: 100vh;
+    }
+    .login-box {
+      max-width: 100%;
+      margin: 0 12px;
+      padding: 24px 20px;
+      border-radius: 16px;
+    }
+    .login-logo { font-size: 36px; margin-bottom: 6px; }
+    .login-title { font-size: 18px; }
+    .login-subtitle { font-size: 12px; margin-bottom: 20px; }
+    .form-input { font-size: 15px; padding: 12px 14px; }
+    .btn-login { font-size: 15px; padding: 13px; }
+    .login-links {
+      font-size: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  }
+  /* 极窄屏幕 */
+  @media screen and (max-width: 360px) {
+    .login-box { margin: 0 8px; padding: 20px 16px; }
+    .login-logo { font-size: 32px; }
+    .login-title { font-size: 16px; }
+  }
 </style>
 </head>
 <body>
