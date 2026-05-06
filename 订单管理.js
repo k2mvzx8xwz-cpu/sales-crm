@@ -628,11 +628,23 @@ function showCustomerPicker() {
       <button class="filter-tab" data-type="software" onclick="renderCustomerPickerList(this)">软件客户</button>
       <button class="filter-tab" data-type="hardware" onclick="renderCustomerPickerList(this)">硬件客户</button>
     </div>
-    <div id="customer-picker-list" style="max-height:380px;overflow-y:auto;"></div>
+    <div id="customer-picker-list" style="max-height:380px;overflow-y:auto;display:flex;align-items:center;justify-content:center;color:var(--text-muted);min-height:120px;">
+      <span>加载中…</span>
+    </div>
   `;
   showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button><button onclick="confirmCustomerSelection()" class="btn-primary" style="margin-left:8px">确定</button>`);
   window._pendingCustomerId = null;
-  setTimeout(() => renderCustomerPickerList(document.querySelector('[data-type="all"]')), 50);
+  // 等待数据库就绪后渲染
+  let attempts = 0;
+  function tryRender() {
+    attempts++;
+    if (window.APP && window.APP.db) {
+      renderCustomerPickerList(document.querySelector('[data-type="all"]'));
+    } else if (attempts < 30) {
+      setTimeout(tryRender, 100);
+    }
+  }
+  setTimeout(tryRender, 50);
 }
 
 function renderCustomerPickerList(btn) {
@@ -895,23 +907,26 @@ function confirmNewCard() {
     showToast('已选中现有卡密');
     return;
   }
-  // 新建卡密入库（状态未使用）
+  // 新建卡密入库（状态未使用），补全所有字段
+  const now = Date.now();
   const newCard = {
     id: genId(),
     category: catFilter || '',
     cardCode: keyword,
     status: 'unused',
-    buyDate: todayStr(),
-    expireDate: '',
+    buyDate: todayStr(),         // 购买时间（今天）
+    addedTime: now,                // 添加时间（精确到毫秒）
+    expireDate: '',                // 有效期至（留空，由订单保存时根据分类计算）
     relatedOrderNo: '',
     relatedWechatName: '',
     relatedWechatId: '',
     note: '从订单表单添加',
-    createdAt: Date.now()
+    createdAt: now
   };
   db.cards = db.cards || [];
   db.cards.push(newCard);
   saveDB();
+  // 选中后若有效期仍为空则按分类+当前日期自动计算
   selectCard(newCard.id, newCard.cardCode, newCard.category, '');
   showToast('新卡密已入库并选中', 'success');
   document.getElementById('card-dropdown').style.display = 'none';
