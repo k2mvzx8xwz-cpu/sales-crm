@@ -614,8 +614,10 @@ function fillFromCustomerAddress() {
 // 客户变化（选中后自动填充收货地址）
 function onCustomerChange(customerId) {
   if (!customerId) return;
-  const db = window.APP.db;
-  const c = db.customers.find(c => c.id === customerId);
+  const db = window.APP && window.APP.db;
+  if (!db) return;
+  const numericId = Number(customerId);
+  const c = db.customers.find(x => x.id === numericId);
   if (!c) return;
   if (c.type === 'hardware') fillFromCustomerAddress();
 }
@@ -678,26 +680,28 @@ function previewCustomerForOrder(id, el) {
   document.querySelectorAll('#customer-picker-list > div').forEach(d => { d.style.background = ''; delete d.dataset.selected; });
   el.style.background = 'var(--bg-hover)';
   el.dataset.selected = 'true';
-  window._pendingCustomerId = id;
+  window._pendingCustomerId = String(Number(id)); // 统一转为字符串数字
 }
 
 // 确认选择客户
 function confirmCustomerSelection() {
   const id = window._pendingCustomerId;
-  if (!id) { showToast('请先选择一个客户', 'warning'); return; }
+  if (!id) { showToast('请先在列表中点击选择一个客户', 'warning'); return; }
   selectCustomerForOrder(id);
 }
 
 function selectCustomerForOrder(id) {
   const db = window.APP && window.APP.db;
-  if (!db) return;
-  const c = db.customers.find(x => String(x.id) === String(id));
-  if (!c) return;
-  document.getElementById('of-customerSearch').value = `${c.wechatName}${c.wechatId?' ('+c.wechatId+')':''}`;
-  document.getElementById('of-customerId').value = id;
+  if (!db) { showToast('数据未就绪，请重试', 'error'); return; }
+  const numericId = Number(id);
+  const c = db.customers.find(x => x.id === numericId);
+  if (!c) { showToast('客户未找到，可能已被删除', 'error'); return; }
+  document.getElementById('of-customerSearch').value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
+  document.getElementById('of-customerId').value = String(numericId);
   window._pendingCustomerId = null;
   closeModal();
-  onCustomerChange(id);
+  onCustomerChange(String(numericId));
+  showToast(`已选择客户：${c.wechatName || c.wechatId || '未知'}`, 'success');
 }
 
 // ========== 调整2：客户模糊搜索下拉 ==========
