@@ -70,6 +70,19 @@ function renderSettings() {
           </div>
         </div>
         <button class="btn-danger" onclick="doChangePassword()" style="margin-top:4px;">确认修改密码</button>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+          <span style="color:var(--text-secondary);font-size:12px;">或</span>
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+        </div>
+        <button onclick="logout()" style="width:100%;margin-top:10px;padding:10px;background:#fde8e8;border:1px solid #fca5a5;border-radius:8px;cursor:pointer;color:#dc2626;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          退出登录
+        </button>
         <div class="form-section-title" style="margin:16px 0 12px;color:var(--text-primary);font-size:14px;">安全问题（找回密码用）</div>
         <div class="form-group">
           <label class="form-label">安全问题</label>

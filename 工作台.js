@@ -180,7 +180,7 @@ function renderDashboard() {
         <span>📋 最近订单</span>
         <button class="btn-xs btn-secondary" onclick="navigateTo('orders')">查看全部</button>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap" style="max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
         <table class="data-table">
           <thead><tr><th>序号</th><th>订单号</th><th>类型</th><th>产品</th><th>客户</th><th>金额</th><th>到期时间</th><th>剩余时间</th><th>操作</th></tr></thead>
           <tbody>
