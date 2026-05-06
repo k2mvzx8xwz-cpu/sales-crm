@@ -134,10 +134,12 @@ async function saveToCloud(data) {
   if (!url) { console.error('[Cloud] saveToCloud: URL 为空'); return false; }
   try {
     window.APP_CLOUD_LAST_SAVE_TIME = Date.now();
+    // 写入前给整库打时间戳，供合并时判断谁更新
+    const dataToSave = Object.assign({}, data, { _lastModified: Date.now() });
     const resp = await fetchWithTimeout(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(dataToSave)
     }, 8000);
     if (resp.ok) { console.log('[Cloud] ✅ 云端写入成功'); return true; }
     console.error('[Cloud] ❌ 写入失败:', resp.status);
@@ -148,16 +150,30 @@ async function saveToCloud(data) {
   }
 }
 
-// 应用云端数据（合并策略：以云端为准，但保留本地未同步的新数据）
+// 应用云端数据（基于时间戳的合并策略）
 function applyCloudData(cloudData) {
   if (!cloudData) return;
   const local = window.APP.db;
   if (!local) return;
 
-  // 简单策略：云端数据直接覆盖（云端是最新权威来源）
   // 记录当前页面，刷新后恢复
   const currentPage = window.APP.currentPage;
-  window.APP.db = cloudData;
+
+  // ========== 核心合并逻辑：基于 _lastModified 时间戳 ==========
+  const cloudTs = parseInt(cloudData._lastModified || '0', 10);
+  const localTs = parseInt(local._lastModified || '0', 10);
+
+  if (cloudTs > localTs) {
+    // 云端更新，用云端数据覆盖本地
+    window.APP.db = cloudData;
+    console.log('[Cloud] 云端更新 (' + new Date(cloudTs).toLocaleTimeString() + ' > ' + new Date(localTs).toLocaleTimeString() + ')，应用云端数据');
+  } else {
+    // 本地更新了但云端是旧的，本地数据推送到云端
+    console.log('[Cloud] 本地更新 (' + new Date(localTs).toLocaleTimeString() + ' >= 云端)，推送本地数据到云端');
+    saveToCloud(window.APP.db);
+  }
+  // ============================================================
+
   saveDB_localOnly();
 
   // 重新渲染当前页面
@@ -166,7 +182,6 @@ function applyCloudData(cloudData) {
   } else if (typeof renderDashboard === 'function') {
     renderDashboard();
   }
-  console.log('[Cloud] 已应用云端数据');
 }
 
 // ==================== 实时云同步（Firebase Realtime Database 轮询）====================
@@ -506,12 +521,16 @@ function saveDB_localOnly() {
 // ==================== 统一加载（云端优先，云端无则本地，本地无则初始化）====================
 async function loadDB() {
   const cloudData = await loadFromCloud();
-  if (cloudData) {
+  const localData = loadDB_localOnly();
+  const cloudTs = parseInt(cloudData && cloudData._lastModified || '0', 10);
+  const localTs = parseInt(localData && localData._lastModified || '0', 10);
+
+  if (cloudData && cloudTs >= localTs) {
+    // 云端数据更新或本地无数据，使用云端数据
     window.APP.db = cloudData;
-    saveDB_localOnly(); // 同步到本地备份
+    saveDB_localOnly();
     return;
   }
-  const localData = loadDB_localOnly();
   if (localData) {
     window.APP.db = localData;
   } else {
