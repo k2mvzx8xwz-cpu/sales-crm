@@ -634,7 +634,7 @@ function showCustomerPicker() {
       <span>加载中…</span>
     </div>
   `;
-  showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button><button onclick="confirmCustomerSelection()" class="btn-primary" style="margin-left:8px">确定</button>`);
+  showModal('选择客户', content, `<button onclick="closeModal()" class="btn-secondary">取消</button><button onclick="confirmCustomerSelection()" class="btn-primary" style="margin-left:8px">确定</button>`, 'xl', true);
   window._pendingCustomerId = null;
   window._pendingCustomerObj = null;
   // 等待数据库就绪后渲染
@@ -727,24 +727,16 @@ function selectCustomerByObj(id) {
   if (!c) c = db.customers.find(x => String(x.id) === String(id));
   if (!c) { showToast('客户未找到，可能已被删除', 'error'); return; }
 
-  // 检查表单字段是否存在，不存在则重新渲染
+  // 检查表单字段是否存在
   const searchField = document.getElementById('of-customerSearch');
   const idField = document.getElementById('of-customerId');
   if (!searchField || !idField) {
-    // 表单丢失，强制重新渲染新增订单表单
-    console.log('[选择器] 表单字段丢失，强制重新渲染...');
-    // 暂存客户对象
-    window._pendingCustomerObj = c;
-    window._pendingCustomerId = String(c.id);
-    showNewOrderForm({ type: window.APP._currentOrderType || 'software' });
-    // 重新获取字段
-    const s2 = document.getElementById('of-customerSearch');
-    const i2 = document.getElementById('of-customerId');
-    if (s2) s2.value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
-    if (i2) i2.value = String(c.id);
-    window._pendingCustomerId = null;
+    // 表单不在DOM中，提示用户即可（不要强制重渲染）
+    console.log('[选择器] 表单字段不在DOM中，放弃填入（用户需重新打开新增订单）');
     window._pendingCustomerObj = null;
-    showToast(`已选择客户：${c.wechatName || c.wechatId || '未知'}`, 'success');
+    window._pendingCustomerId = null;
+    closeModal();
+    showToast('客户已选中，但新增订单表单已关闭。请重新打开「新增软件订单/硬件订单」', 'warning');
     return;
   }
 

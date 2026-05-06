@@ -724,8 +724,20 @@ function showToast(msg, type = 'success', duration = 2500) {
 }
 
 // ==================== 弹窗工具 ====================
-function showModal(title, content, footer = '', size = 'md') {
-  closeModal();
+function showModal(title, content, footer = '', size = 'md', stack = false) {
+  // 堆叠模式：不关闭现有弹窗，而是隐藏它
+  const existing = document.getElementById('modal-overlay');
+  if (existing) {
+    if (stack) {
+      // 推入堆栈，隐藏（不销毁）
+      existing.style.display = 'none';
+      existing.dataset.hidden = 'true';
+      window._modalStack = window._modalStack || [];
+      window._modalStack.push(existing);
+    } else {
+      closeModal();
+    }
+  }
   const sizeMap = { sm: '400px', md: '600px', lg: '800px', xl: '1000px' };
   const overlay = document.createElement('div');
   overlay.id = 'modal-overlay';
@@ -748,6 +760,14 @@ function showModal(title, content, footer = '', size = 'md') {
 function closeModal() {
   const el = document.getElementById('modal-overlay');
   if (el) el.remove();
+  // 恢复堆栈中的上一个弹窗
+  if (window._modalStack && window._modalStack.length > 0) {
+    const prev = window._modalStack.pop();
+    prev.style.display = 'flex';
+    prev.dataset.hidden = '';
+    prev.id = 'modal-overlay';
+    document.body.appendChild(prev);
+  }
 }
 
 // ==================== 确认弹窗（v20260502 使用原生 confirm 临时方案）====================
