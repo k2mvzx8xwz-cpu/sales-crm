@@ -36,6 +36,62 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- 账号安全设置 -->
+    <div class="section-card">
+      <div class="section-card-header"><span>🔐 账号安全设置</span></div>
+      <div style="padding:16px">
+        <div id="account-info" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.8;">
+          <div id="account-user-row"><span style="color:var(--text-muted)">加载中...</span></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">用户名</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" class="form-input" id="s-username" placeholder="当前用户名" style="flex:1;">
+            <button class="btn-secondary" onclick="doChangeUsername()" style="white-space:nowrap;">修改用户名</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">绑定邮箱</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="email" class="form-input" id="s-email" placeholder="用于找回密码" style="flex:1;">
+            <button class="btn-secondary" onclick="doChangeEmail()" style="white-space:nowrap;">保存邮箱</button>
+          </div>
+          <div class="form-hint">绑定邮箱后，可用于找回密码验证身份。</div>
+        </div>
+        <div class="form-section-title" style="margin:16px 0 12px;color:var(--text-primary);font-size:14px;">修改密码</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">旧密码</label>
+            <input type="password" class="form-input" id="s-old-pwd" placeholder="旧密码">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">新密码</label>
+            <input type="password" class="form-input" id="s-new-pwd" placeholder="新密码（至少4位）">
+          </div>
+        </div>
+        <button class="btn-danger" onclick="doChangePassword()" style="margin-top:4px;">确认修改密码</button>
+        <div class="form-section-title" style="margin:16px 0 12px;color:var(--text-primary);font-size:14px;">安全问题（找回密码用）</div>
+        <div class="form-group">
+          <label class="form-label">安全问题</label>
+          <select class="form-input" id="s-secret-q">
+            <option value="">请选择安全问题</option>
+            <option value="pet">您第一只宠物的名字？</option>
+            <option value="school">您小学的名称？</option>
+            <option value="city">您出生的城市？</option>
+            <option value="mother">您母亲的名字？</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">答案</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" class="form-input" id="s-secret-a" placeholder="请输入答案" style="flex:1;">
+            <button class="btn-secondary" onclick="doChangeSecret()" style="white-space:nowrap;">保存安全问题</button>
+          </div>
+          <div class="form-hint">设置安全问题后，可在忘记密码时通过回答问题重置密码。</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 云端数据同步 -->
     <div class="section-card">
       <div class="section-card-header"><span>☁️ 云端数据同步（PC与手机数据同步）</span><span id="sync-status" style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:8px"></span></div>
@@ -873,6 +929,90 @@ function importAllData() {
   resultEl.innerHTML = '<span style="color:#10b981">✅ 数据导入成功！已切换到工作台。</span>';
   showToast('数据导入成功！', 'success', 3000);
 }
+
+// ==================== 账号安全设置 ====================
+function initAccountSettings() {
+  var user = getCurrentUser();
+  var userRow = document.getElementById('account-user-row');
+  if (!userRow) return;
+  if (!user) {
+    userRow.innerHTML = '<span style="color:#f87171">未登录</span>';
+    return;
+  }
+  userRow.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><span style="color:#60a5fa;font-weight:600;">👤 ' + escHtml(user.username) + '</span><span style="color:var(--text-muted);font-size:12px;">' + (user.email ? '📧 ' + escHtml(user.email) : '（未绑定邮箱）') + '</span></div>';
+  var uInput = document.getElementById('s-username');
+  if (uInput) uInput.value = user.username || '';
+  var eInput = document.getElementById('s-email');
+  if (eInput) eInput.value = user.email || '';
+  var qSelect = document.getElementById('s-secret-q');
+  if (qSelect && user.secretQuestion) qSelect.value = user.secretQuestion;
+  var aInput = document.getElementById('s-secret-a');
+  if (aInput) aInput.value = user.secretAnswer || '';
+}
+
+function doChangeUsername() {
+  var input = document.getElementById('s-username');
+  if (!input) return;
+  var newName = input.value.trim();
+  if (!newName) { showToast('请输入用户名', 'error'); return; }
+  if (newName.length < 2) { showToast('用户名至少2位', 'error'); return; }
+  changeUsername(newName);
+  setTimeout(initAccountSettings, 500);
+}
+
+function doChangeEmail() {
+  var input = document.getElementById('s-email');
+  if (!input) return;
+  var email = input.value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('邮箱格式不正确', 'error'); return;
+  }
+  changeUserEmail(email);
+  setTimeout(initAccountSettings, 500);
+}
+
+function doChangePassword() {
+  var oldInput = document.getElementById('s-old-pwd');
+  var newInput = document.getElementById('s-new-pwd');
+  if (!oldInput || !newInput) return;
+  var oldPwd = oldInput.value;
+  var newPwd = newInput.value;
+  if (!oldPwd) { showToast('请输入旧密码', 'error'); return; }
+  if (!newPwd) { showToast('请输入新密码', 'error'); return; }
+  if (newPwd.length < 4) { showToast('新密码至少4位', 'error'); return; }
+  if (oldPwd === newPwd) { showToast('新密码不能与旧密码相同', 'error'); return; }
+  var ok = changeCurrentPassword(oldPwd, newPwd);
+  if (ok) {
+    oldInput.value = '';
+    newInput.value = '';
+  }
+}
+
+function doChangeSecret() {
+  var qSelect = document.getElementById('s-secret-q');
+  var aInput = document.getElementById('s-secret-a');
+  if (!qSelect || !aInput) return;
+  var question = qSelect.value;
+  var answer = aInput.value.trim();
+  if (!question) { showToast('请选择安全问题', 'error'); return; }
+  if (!answer) { showToast('请输入答案', 'error'); return; }
+  changeUserSecret(question, answer);
+}
+
+// HTML转义防注入
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// renderSettings 包装：自动调用 initAccountSettings
+(function() {
+  var _orig = renderSettings;
+  window.renderSettings = function() {
+    _orig.apply(this, arguments);
+    setTimeout(initAccountSettings, 80);
+  };
+})();
 
 
 

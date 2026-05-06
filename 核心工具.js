@@ -1023,3 +1023,88 @@ function cycleTheme() {
   const next = themes[(idx + 1) % themes.length];
   saveTheme(next);
 }
+
+// ==================== 账号认证系统 ====================
+function isLoggedIn() {
+  try {
+    const session = JSON.parse(localStorage.getItem('auth_session') || 'null');
+    return session && session.username;
+  } catch(e) { return false; }
+}
+function getCurrentUser() {
+  try {
+    const session = JSON.parse(localStorage.getItem('auth_session') || 'null');
+    if (!session || !session.username) return null;
+    const users = JSON.parse(localStorage.getItem('auth_users') || '[]');
+    return users.find(u => u.username === session.username) || null;
+  } catch(e) { return null; }
+}
+function logout() {
+  localStorage.removeItem('auth_session');
+  location.href = 'login.html';
+}
+// 修改当前账号的密码（需验证旧密码）
+function changeCurrentPassword(oldPwd, newPwd) {
+  const user = getCurrentUser();
+  if (!user) { showToast('未登录', 'error'); return false; }
+  if (btoa(oldPwd) !== user.password) { showToast('旧密码不正确', 'error'); return false; }
+  if (newPwd.length < 4) { showToast('新密码至少4位', 'error'); return false; }
+  const users = JSON.parse(localStorage.getItem('auth_users') || '[]');
+  const idx = users.findIndex(u => u.username === user.username);
+  if (idx === -1) { showToast('用户不存在', 'error'); return false; }
+  users[idx].password = btoa(newPwd);
+  users[idx].updatedAt = Date.now();
+  localStorage.setItem('auth_users', JSON.stringify(users));
+  showToast('密码修改成功', 'success');
+  return true;
+}
+// 修改用户名
+function changeUsername(newUsername) {
+  const user = getCurrentUser();
+  if (!user) { showToast('未登录', 'error'); return false; }
+  if (!newUsername || newUsername.length < 2) { showToast('用户名至少2位', 'error'); return false; }
+  const users = JSON.parse(localStorage.getItem('auth_users') || '[]');
+  // 检查新用户名是否已被占用
+  if (users.some(u => u.username === newUsername && u.username !== user.username)) {
+    showToast('用户名已被占用', 'error'); return false;
+  }
+  const idx = users.findIndex(u => u.username === user.username);
+  users[idx].username = newUsername;
+  users[idx].updatedAt = Date.now();
+  localStorage.setItem('auth_users', JSON.stringify(users));
+  // 更新会话
+  const session = JSON.parse(localStorage.getItem('auth_session') || '{}');
+  session.username = newUsername;
+  localStorage.setItem('auth_session', JSON.stringify(session));
+  showToast('用户名已修改为：' + newUsername, 'success');
+  return true;
+}
+// 修改绑定邮箱
+function changeUserEmail(newEmail) {
+  const user = getCurrentUser();
+  if (!user) { showToast('未登录', 'error'); return false; }
+  if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+    showToast('邮箱格式不正确', 'error'); return false;
+  }
+  const users = JSON.parse(localStorage.getItem('auth_users') || '[]');
+  const idx = users.findIndex(u => u.username === user.username);
+  users[idx].email = newEmail || '';
+  users[idx].updatedAt = Date.now();
+  localStorage.setItem('auth_users', JSON.stringify(users));
+  showToast('邮箱已更新', 'success');
+  return true;
+}
+// 修改安全问题
+function changeUserSecret(question, answer) {
+  const user = getCurrentUser();
+  if (!user) { showToast('未登录', 'error'); return false; }
+  if (!question || !answer) { showToast('请填写完整', 'error'); return false; }
+  const users = JSON.parse(localStorage.getItem('auth_users') || '[]');
+  const idx = users.findIndex(u => u.username === user.username);
+  users[idx].secretQuestion = question;
+  users[idx].secretAnswer = answer.trim();
+  users[idx].updatedAt = Date.now();
+  localStorage.setItem('auth_users', JSON.stringify(users));
+  showToast('安全问题已设置', 'success');
+  return true;
+}

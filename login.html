@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>登录 - 销售客户管理系统</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    color: #e2e8f0;
+  }
+  .login-box {
+    width: 100%; max-width: 380px;
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 32px 28px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .login-logo {
+    text-align: center;
+    margin-bottom: 8px;
+    font-size: 40px;
+  }
+  .login-title {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #f1f5f9;
+  }
+  .login-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 28px;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-label {
+    display: block;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: #3b82f6; }
+  .form-input::placeholder { color: #475569; }
+  .btn-login {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-top: 8px;
+  }
+  .btn-login:hover { opacity: 0.9; }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-links {
+    display: flex; justify-content: space-between;
+    margin-top: 16px; font-size: 13px;
+  }
+  .login-links a {
+    color: #60a5fa; text-decoration: none;
+  }
+  .login-links a:hover { text-decoration: underline; }
+  .login-error {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .login-error.show { display: block; }
+  .login-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #e2e8f0;
+    padding: 10px 24px; border-radius: 8px;
+    font-size: 14px; z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    display: none;
+  }
+  .login-toast.show { display: block; }
+  /* 找回密码弹窗 */
+  .recover-box { display: none; }
+  .recover-box.show { display: block; }
+  .login-box .recover-box { margin-top: 0; }
+  .back-link {
+    color: #94a3b8; text-decoration: none; font-size: 13px;
+    display: inline-block; margin-bottom: 16px; cursor: pointer;
+  }
+  .back-link:hover { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<!-- 登录表单 -->
+<div class="login-box" id="login-box">
+  <div class="login-logo">🔐</div>
+  <div class="login-title">销售客户管理系统</div>
+  <div class="login-subtitle">请输入账号密码登录</div>
+  <div class="login-error" id="login-error"></div>
+  <form id="login-form" onsubmit="return doLogin()">
+    <div class="form-group">
+      <label class="form-label">用户名</label>
+      <input type="text" class="form-input" id="login-user" placeholder="请输入用户名" autocomplete="username" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">密码</label>
+      <input type="password" class="form-input" id="login-pass" placeholder="请输入密码" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn-login" id="login-btn">登  录</button>
+  </form>
+  <div class="login-links">
+    <a onclick="showRecover()">忘记密码？</a>
+  </div>
+</div>
+
+<!-- 找回密码表单 -->
+<div class="login-box recover-box" id="recover-box">
+  <a class="back-link" onclick="showLogin()">← 返回登录</a>
+  <div class="login-title" style="font-size:17px;">找回密码</div>
+  <div class="login-subtitle">回答安全问题后重置密码</div>
+  <div class="login-error" id="recover-error"></div>
+  <form id="recover-form" onsubmit="return doRecover()">
+    <div class="form-group">
+      <label class="form-label">用户名</label>
+      <input type="text" class="form-input" id="recover-user" placeholder="请输入用户名" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">绑定的邮箱</label>
+      <input type="email" class="form-input" id="recover-email" placeholder="请输入绑定的邮箱" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">安全问题</label>
+      <select class="form-input" id="recover-question" required>
+        <option value="">请选择安全问题</option>
+        <option value="pet">您第一只宠物的名字？</option>
+        <option value="school">您小学的名称？</option>
+        <option value="city">您出生的城市？</option>
+        <option value="mother">您母亲的名字？</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">安全问题答案</label>
+      <input type="text" class="form-input" id="recover-answer" placeholder="请输入答案" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">新密码</label>
+      <input type="password" class="form-input" id="recover-newpass" placeholder="请输入新密码（至少4位）" minlength="4" required>
+    </div>
+    <button type="submit" class="btn-login">重置密码</button>
+  </form>
+</div>
+
+<div class="login-toast" id="login-toast"></div>
+
+<script>
+// ========== 初始化认证系统 ==========
+function initAuthSystem() {
+  const users = JSON.parse(localStorage.getItem('auth_users') || 'null');
+  if (!users) {
+    // 默认账号：admin / admin
+    const defaultUser = {
+      username: 'admin',
+      // 简单哈希存储（非安全，纯前端限制）
+      password: btoa('admin'),
+      email: '',
+      secretQuestion: '',
+      secretAnswer: '',
+      updatedAt: Date.now()
+    };
+    localStorage.setItem('auth_users', JSON.stringify([defaultUser]));
+  }
+}
+
+function getUsers() {
+  return JSON.parse(localStorage.getItem('auth_users') || '[]');
+}
+function saveUsers(users) {
+  localStorage.setItem('auth_users', JSON.stringify(users));
+}
+
+// ========== 登录 ==========
+function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+
+  if (!username || !password) {
+    errorEl.textContent = '请输入用户名和密码';
+    errorEl.classList.add('show');
+    return false;
+  }
+
+  const users = getUsers();
+  const user = users.find(u => u.username === username);
+
+  if (!user || user.password !== btoa(password)) {
+    errorEl.textContent = '用户名或密码错误';
+    errorEl.classList.add('show');
+    return false;
+  }
+
+  // 登录成功：写入会话
+  localStorage.setItem('auth_session', JSON.stringify({
+    username: user.username,
+    loggedInAt: Date.now()
+  }));
+
+  btn.textContent = '登录成功，跳转中...';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    // 跳转到主页面
+    const jumpTo = (sessionStorage.getItem('auth_redirect') || 'v4.html');
+    sessionStorage.removeItem('auth_redirect');
+    location.href = jumpTo;
+  }, 600);
+
+  return false;
+}
+
+// ========== 找回密码 ==========
+function showRecover() {
+  document.getElementById('login-box').style.display = 'none';
+  document.getElementById('recover-box').classList.add('show');
+  document.getElementById('recover-error').classList.remove('show');
+}
+function showLogin() {
+  document.getElementById('recover-box').classList.remove('show');
+  document.getElementById('login-box').style.display = '';
+  document.getElementById('login-error').classList.remove('show');
+}
+
+function doRecover() {
+  const username = document.getElementById('recover-user').value.trim();
+  const email = document.getElementById('recover-email').value.trim();
+  const question = document.getElementById('recover-question').value;
+  const answer = document.getElementById('recover-answer').value.trim();
+  const newPass = document.getElementById('recover-newpass').value;
+  const errorEl = document.getElementById('recover-error');
+
+  if (!username || !email || !question || !answer || !newPass) {
+    errorEl.textContent = '请填写所有字段';
+    errorEl.classList.add('show');
+    return false;
+  }
+  if (newPass.length < 4) {
+    errorEl.textContent = '新密码至少4位';
+    errorEl.classList.add('show');
+    return false;
+  }
+
+  const users = getUsers();
+  const userIdx = users.findIndex(u => u.username === username);
+
+  if (userIdx === -1) {
+    errorEl.textContent = '用户不存在';
+    errorEl.classList.add('show');
+    return false;
+  }
+
+  const user = users[userIdx];
+
+  // 验证邮箱和安全问题
+  if (user.email && user.email !== email) {
+    errorEl.textContent = '邮箱与绑定邮箱不匹配';
+    errorEl.classList.add('show');
+    return false;
+  }
+  if (user.secretQuestion && user.secretQuestion !== question) {
+    errorEl.textContent = '安全问题选择不正确';
+    errorEl.classList.add('show');
+    return false;
+  }
+  if (user.secretAnswer && user.secretAnswer !== answer) {
+    errorEl.textContent = '安全问题答案不正确';
+    errorEl.classList.add('show');
+    return false;
+  }
+
+  // 重置密码
+  users[userIdx].password = btoa(newPass);
+  users[userIdx].updatedAt = Date.now();
+  if (!user.secretQuestion) {
+    users[userIdx].secretQuestion = question;
+    users[userIdx].secretAnswer = answer;
+  }
+  saveUsers(users);
+
+  showToast('密码已重置，请返回登录');
+  setTimeout(() => showLogin(), 1200);
+
+  return false;
+}
+
+// ========== Toast ==========
+function showToast(msg) {
+  const t = document.getElementById('login-toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ========== 初始化 ==========
+initAuthSystem();
+
+// 如果已经登录，直接跳转
+(function() {
+  const session = JSON.parse(localStorage.getItem('auth_session') || 'null');
+  if (session && session.username) {
+    location.href = (sessionStorage.getItem('auth_redirect') || 'v4.html');
+  }
+})();
+
+// 回车登录
+document.getElementById('login-pass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>
