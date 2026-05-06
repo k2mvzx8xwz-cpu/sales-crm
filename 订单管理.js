@@ -637,7 +637,8 @@ function showCustomerPicker() {
 function renderCustomerPickerList(btn) {
   if (!btn) return;
   const type = btn.dataset.type;
-  const db = window.APP.db;
+  const db = window.APP && window.APP.db;
+  if (!db) return;
   let list = db.customers || [];
   if (type !== 'all') list = list.filter(c => c.type === type);
   document.querySelectorAll('#modal-body .filter-tab').forEach(b => b.classList.remove('active'));
@@ -659,8 +660,9 @@ function renderCustomerPickerList(btn) {
 }
 
 function selectCustomerForOrder(id) {
-  const db = window.APP.db;
-  const c = db.customers.find(x => x.id === id);
+  const db = window.APP && window.APP.db;
+  if (!db) return;
+  const c = db.customers.find(x => String(x.id) === String(id));
   if (!c) return;
   document.getElementById('of-customerSearch').value = `${c.wechatName}${c.wechatId?' ('+c.wechatId+')':''}`;
   document.getElementById('of-customerId').value = id;
