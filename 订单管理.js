@@ -693,9 +693,16 @@ function confirmCustomerSelection() {
 function selectCustomerForOrder(id) {
   const db = window.APP && window.APP.db;
   if (!db) { showToast('数据未就绪，请重试', 'error'); return; }
+  // 调试：先尝试数字ID，再尝试字符串ID
   const numericId = Number(id);
-  const c = db.customers.find(x => x.id === numericId);
-  if (!c) { showToast('客户未找到，可能已被删除', 'error'); return; }
+  let c = db.customers.find(x => x.id === numericId);
+  if (!c) c = db.customers.find(x => String(x.id) === String(id));
+  // 调试弹窗：直接告诉用户问题在哪
+  if (!c) {
+    const allIds = (db.customers||[]).map(x=>({id:x.id, type:typeof x.id, name:x.wechatName}));
+    alert('调试信息：\n传入的ID=' + id + ' (类型:' + typeof id + ')\n转数字后=' + numericId + '\n\n数据库中的客户ID：\n' + allIds.slice(0,5).map(x=>x.id+' ('+x.type+') - '+x.name).join('\n'));
+    return;
+  }
   document.getElementById('of-customerSearch').value = `${c.wechatName || ''}${c.wechatId ? ' (' + c.wechatId + ')' : ''}`;
   document.getElementById('of-customerId').value = String(numericId);
   window._pendingCustomerId = null;
