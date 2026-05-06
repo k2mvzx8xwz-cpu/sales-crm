@@ -142,16 +142,16 @@
 </nav>
 
 <!-- JS模块加载 -->
-<script src="核心工具.js?v=202605061045"></script>
-<script src="工作台.js?v=202605061045"></script>
-<script src="客户管理.js?v=202605061045"></script>
-<script src="订单管理.js?v=202605061045"></script>
-<script src="卡密库.js?v=202605061045"></script>
-<script src="商品管理.js?v=202605061045"></script>
-<script src="产品销售.js?v=202605061045"></script>
-<script src="数据统计.js?v=202605061045"></script>
-<script src="系统设置.js?v=202605061045"></script>
-<script src="扩展功能.js?v=202605061045"></script>
+<script src="核心工具.js?v=202605061115"></script>
+<script src="工作台.js?v=202605061115"></script>
+<script src="客户管理.js?v=202605061115"></script>
+<script src="订单管理.js?v=202605061115"></script>
+<script src="卡密库.js?v=202605061115"></script>
+<script src="商品管理.js?v=202605061115"></script>
+<script src="产品销售.js?v=202605061115"></script>
+<script src="数据统计.js?v=202605061115"></script>
+<script src="系统设置.js?v=202605061115"></script>
+<script src="扩展功能.js?v=202605061115"></script>
 
 <script>
 function toggleMobileMenu() {
@@ -173,13 +173,14 @@ function closeMobileMenu() {
 
 var _origNavigateTo = navigateTo;
 navigateTo = function(page) {
+  // 记录是从哪里进入订单页的，用于 renderOrders 决定是否显示筛选标签栏
+  if (page === 'orders-software') { window.ordersViewMode = 'software'; orderFilter = 'software'; orderPage = 1; }
+  else if (page === 'orders-hardware') { window.ordersViewMode = 'hardware'; orderFilter = 'hardware'; orderPage = 1; }
+  else if (page === 'orders') { window.ordersViewMode = 'all'; orderFilter = 'all'; orderPage = 1; }
+  else { window.ordersViewMode = null; }
   _origNavigateTo(page);
-  if (page === 'orders-software') {
-    if (typeof setOrderFilterAndRender === 'function') { setOrderFilterAndRender('software'); }
-    else if (typeof renderOrders === 'function') { window.orderFilter = 'software'; renderOrders(); }
-  } else if (page === 'orders-hardware') {
-    if (typeof setOrderFilterAndRender === 'function') { setOrderFilterAndRender('hardware'); }
-    else if (typeof renderOrders === 'function') { window.orderFilter = 'hardware'; renderOrders(); }
+  if (page === 'orders-software' || page === 'orders-hardware' || page === 'orders') {
+    if (typeof renderOrders === 'function') renderOrders();
   }
   if (window.innerWidth < 768) closeMobileMenu();
   var titles = {

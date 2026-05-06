@@ -53,15 +53,29 @@ function renderOrders() {
 
   const pager = paginate(list, orderPage, 15);
 
+  // 根据导航来源决定页面标题和筛选栏显示
+  const viewMode = window.ordersViewMode || 'all';
+  const pageTitle = viewMode === 'software' ? '软件订单'
+    : viewMode === 'hardware' ? '硬件订单'
+    : '订单管理';
+  const showFilterBar = viewMode === 'all'; // 只有从订单管理进入才显示全部/软件/硬件标签
+
+  // 根据当前筛选决定列显示
+  const isSoftware = orderFilter === 'software';
+  const isHardware = orderFilter === 'hardware';
+  const swColStyle = isHardware ? 'display:none' : '';
+  const hwColStyle = !isHardware ? 'display:none' : '';
+
   el.innerHTML = `
     <div class="page-header">
-      <h2 class="page-title">订单管理</h2>
+      <h2 class="page-title">${pageTitle}</h2>
       <div style="display:flex;gap:8px;">
         <button class="btn-danger" onclick="batchDeleteOrders()" ${orderSelected.length===0?'disabled style="opacity:0.5;cursor:not-allowed;"':''}>批量删除 (${orderSelected.length})</button>
         <button class="btn-primary" onclick="showAddOrderModal('software')">+ 新增软件订单</button>
         <button class="btn-success" onclick="showAddOrderModal('hardware')">+ 新增硬件订单</button>
       </div>
     </div>
+    ${showFilterBar ? `
     <div class="toolbar">
       <div class="filter-tabs">
         <button class="filter-tab ${orderFilter==='all'?'active':''}" onclick="setOrderFilter('all')">全部 (${(db.orders||[]).length})</button>
@@ -72,7 +86,13 @@ function renderOrders() {
         <input type="text" placeholder="搜索客户/产品..." value="${orderKeyword}"
           oninput="orderKeyword=this.value;orderPage=1;renderOrders()">
       </div>
-    </div>
+    </div>` : `
+    <div class="toolbar">
+      <div class="search-box">
+        <input type="text" placeholder="搜索客户/产品..." value="${orderKeyword}"
+          oninput="orderKeyword=this.value;orderPage=1;renderOrders()">
+      </div>
+    </div>`}
     <div class="section-card">
       <div class="table-wrap">
         <table class="data-table">
@@ -83,24 +103,20 @@ function renderOrders() {
               <th>订单号</th>
               <th>微信昵称</th>
               <th>产品名称</th>
-              <!-- 软件列 -->
-              <th class="sw-col">卡密</th>
-              <!-- 硬件列 -->
-              <th class="hw-col" style="display:none">接口类型</th>
+              <th class="sw-col" style="${swColStyle}">卡密</th>
+              <th class="hw-col" style="${hwColStyle}">接口类型</th>
               <th>金额</th>
               <th>数量</th>
-              <!-- 软件列 -->
-              <th class="sw-col">分类</th>
-              <!-- 硬件列 -->
-              <th class="hw-col" style="display:none">快递公司</th>
+              <th class="sw-col" style="${swColStyle}">分类</th>
+              <th class="hw-col" style="${hwColStyle}">快递公司</th>
               <th>购买日期</th>
-              <th>有效期至</th>
-              <th>剩余时间</th>
+              <th class="sw-col" style="${swColStyle}">有效期至</th>
+              <th class="sw-col" style="${swColStyle}">剩余时间</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="11" class="empty-cell">暂无订单数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="15" class="empty-cell">暂无订单数据</td></tr>` :
               pager.items.map((o, idx) => {
                 const isChecked = orderSelected.includes(o.id);
                 const pName = o.productName || '-';
@@ -137,15 +153,15 @@ function renderOrders() {
                   <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td>${o.wechatName||'-'}</td>
                   <td style="white-space:normal;word-break:break-all;min-width:160px;max-width:220px;">${pName}</td>
-                  <td class="sw-col" style="white-space:nowrap;">${cardCell}</td>
-                  <td class="hw-col" style="display:none">${o.portType ? `<span class="badge badge-gray">${o.portType}口</span>` : '-'}</td>
+                  <td class="sw-col" style="${swColStyle} white-space:nowrap;">${cardCell}</td>
+                  <td class="hw-col" style="${hwColStyle}">${o.portType ? `<span class="badge badge-gray">${o.portType}口</span>` : '-'}</td>
                   <td>¥${formatMoney(o.totalAmount)}</td>
                   <td>${o.qty||1}</td>
-                  <td class="sw-col">${extraCol}</td>
-                  <td class="hw-col" style="display:none">${extraCol}</td>
+                  <td class="sw-col" style="${swColStyle}">${extraCol}</td>
+                  <td class="hw-col" style="${hwColStyle}">${extraCol}</td>
                   <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
-                  <td style="white-space:nowrap;font-size:12px;">${expireCell}</td>
-                  <td style="white-space:nowrap;">${remainCell}</td>
+                  <td class="sw-col" style="${swColStyle} white-space:nowrap;font-size:12px;">${expireCell}</td>
+                  <td class="sw-col" style="${swColStyle} white-space:nowrap;">${remainCell}</td>
                   <td class="action-cell">
                     <button class="btn-xs btn-primary" onclick="showOrderDetail('${o.id}')">详情</button>
                     <button class="btn-xs btn-secondary" onclick="showEditOrderModal('${o.id}')">编辑</button>
@@ -167,13 +183,6 @@ function setOrderFilter(f) {
   orderFilter = f;
   orderPage = 1;
   renderOrders();
-  // 动态切换表格列显示（软件列 vs 硬件列）
-  setTimeout(() => {
-    const table = document.querySelector('#page-orders .data-table');
-    if (table) {
-      table.classList.toggle('filter-software', f === 'software');
-    }
-  }, 0);
 }
 
 // ==================== 新增/编辑订单弹窗 ====================
