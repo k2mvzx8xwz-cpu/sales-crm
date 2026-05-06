@@ -682,6 +682,7 @@ function renderCustomerPickerList(btn) {
 
 // 单击：设置高亮和待选客户对象
 function onPickerItemClick(el, id, idx) {
+  console.log('[选择器] 客户行被点击, id=' + id + ', idx=' + idx);
   document.querySelectorAll('#customer-picker-list > div').forEach(d => { d.style.background = ''; delete d.dataset.selected; });
   el.style.background = 'var(--bg-hover)';
   el.dataset.selected = 'true';
@@ -690,6 +691,9 @@ function onPickerItemClick(el, id, idx) {
   const db = window.APP && window.APP.db;
   if (db) {
     window._pendingCustomerObj = db.customers.find(c => String(c.id) === id) || null;
+    console.log('[选择器] 从DB找到客户对象:', window._pendingCustomerObj ? (window._pendingCustomerObj.wechatName || window._pendingCustomerObj.wechatId) : '未找到');
+  } else {
+    console.log('[选择器] 数据库未就绪，APP.db=', window.APP);
   }
 }
 
@@ -700,8 +704,15 @@ function onPickerDblClick(id) {
 
 // 确认选择客户
 function confirmCustomerSelection() {
+  console.log('[选择器] 确定按钮被点击');
+  console.log('[选择器] _pendingCustomerObj =', window._pendingCustomerObj);
+  console.log('[选择器] _pendingCustomerId =', window._pendingCustomerId);
   const obj = window._pendingCustomerObj;
-  if (!obj) { showToast('请先点击选择一个客户', 'warning'); return; }
+  if (!obj) {
+    showToast('请先点击选择一个客户', 'warning');
+    alert('调试：未选中客户！\n_pendingCustomerId=' + window._pendingCustomerId + '\n_pendingCustomerObj=' + window._pendingCustomerObj);
+    return;
+  }
   selectCustomerByObj(window._pendingCustomerId);
 }
 
