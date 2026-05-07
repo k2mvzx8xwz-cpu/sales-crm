@@ -492,7 +492,7 @@ function listenCloudChanges(callback) {
   if (typeof callback === 'function') callback();
 }
 
-// 合并本地和云端数据（云端优先，时间戳较新的优先）
+// 合并本地和云端数据（时间戳较新的优先）
 function mergeData(local, cloud) {
   if (!cloud) return local;
   if (!local) return cloud;
@@ -510,10 +510,36 @@ function mergeData(local, cloud) {
     });
     result[key] = Object.values(map);
   });
-  // settings 以云端为准
+  // 合并 productSalesData（对象结构，时间戳较新的优先）
+  const localPSD = local.productSalesData || {};
+  const cloudPSD = cloud.productSalesData || {};
+  result.productSalesData = result.productSalesData || {};
+  Object.keys({ ...localPSD, ...cloudPSD }).forEach(productId => {
+    const localItem = localPSD[productId];
+    const cloudItem = cloudPSD[productId];
+    if (!cloudItem) {
+      result.productSalesData[productId] = localItem;
+    } else if (!localItem) {
+      result.productSalesData[productId] = cloudItem;
+    } else {
+      // 两者都有，保留时间戳较新的
+      const localTs = parseInt(localItem._lastModified || '0', 10);
+      const cloudTs = parseInt(cloudItem._lastModified || '0', 10);
+      result.productSalesData[productId] = cloudTs > localTs ? cloudItem : localItem;
+    }
+  });
+  // settings 以云端为准（firebaseConfig 以本地为准）
   if (local.settings) {
     result.settings = { ...local.settings, ...cloud.settings };
+    if (local.settings.firebaseConfig) {
+      result.settings.firebaseConfig = local.settings.firebaseConfig;
+    }
   }
+  // 整库时间戳取最大值
+  result._lastModified = Math.max(
+    parseInt(local._lastModified || '0', 10),
+    parseInt(cloud._lastModified || '0', 10)
+  );
   return result;
 }
 
@@ -1119,8 +1145,10 @@ async function backgroundSync(s) {
     console.log('[Cloud] 正在从云端加载数据...');
     var cloudData = await loadFromCloud();
     if (cloudData) {
-      console.log('[Cloud] 云端有数据，应用云端数据');
-      window.APP.db = cloudData;
+      console.log('[Cloud] 云端有数据，执行合并');
+      // 关键修复：合并本地和云端数据，保留最新的修改
+      var mergedData = mergeData(window.APP.db, cloudData);
+      window.APP.db = mergedData;
       saveDB_localOnly();
       if (typeof renderDashboard === 'function') renderDashboard();
       showToast('✅ 已同步云端数据（' + (cloudData.customers ? cloudData.customers.length : 0) + ' 条客户）', 'success', 3000);
