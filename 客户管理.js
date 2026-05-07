@@ -252,7 +252,8 @@ function saveCustomer(editId = null, onCreated = null) {
       matchProduct: document.getElementById('cf-matchProduct')?.value?.trim() || '',
       note: document.getElementById('cf-note')?.value?.trim() || '',
       addedTime: getFullDatetime(),  // 添加时间（年月日时分秒）
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      _lastModified: Date.now() // 添加时间戳用于合并
     };
     db.customers.push(customer);
     saveDB();

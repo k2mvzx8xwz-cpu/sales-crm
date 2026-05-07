@@ -177,7 +177,8 @@ function saveProductSales(id) {
     costPrice: parseFloat(document.getElementById('psd-costPrice')?.value) || 0,
     agentPrice: parseFloat(document.getElementById('psd-agentPrice')?.value) || 0,
     salePrice: parseFloat(document.getElementById('psd-salePrice')?.value) || 0,
-    status: document.getElementById('psd-status')?.value || 'draft'
+    status: document.getElementById('psd-status')?.value || 'draft',
+    _lastModified: Date.now() // 添加时间戳用于合并
   };
   saveDB();
   closeModal();
@@ -219,6 +220,7 @@ function batchSetStatus() {
 function execBatchSetStatus() {
   const db = window.APP.db;
   const newStatus = document.getElementById('batch-status-select')?.value || 'draft';
+  const now = Date.now();
   if (!db.productSalesData) db.productSalesData = {};
   psSelected.forEach(id => {
     if (!db.productSalesData[id]) {
@@ -227,10 +229,12 @@ function execBatchSetStatus() {
         costPrice: p ? p.cost || 0 : 0,
         agentPrice: 0,
         salePrice: p ? p.price || 0 : 0,
-        status: newStatus
+        status: newStatus,
+        _lastModified: now
       };
     } else {
       db.productSalesData[id].status = newStatus;
+      db.productSalesData[id]._lastModified = now; // 更新时间戳
     }
   });
   saveDB();

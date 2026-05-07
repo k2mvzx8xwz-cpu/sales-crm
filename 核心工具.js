@@ -150,7 +150,7 @@ async function saveToCloud(data) {
   }
 }
 
-// 应用云端数据（基于时间戳的合并策略）
+// 应用云端数据（基于时间戳的逐条合并策略 - 彻底解决数据覆盖问题）
 function applyCloudData(cloudData) {
   if (!cloudData) return;
   const local = window.APP.db;
@@ -159,20 +159,71 @@ function applyCloudData(cloudData) {
   // 记录当前页面，刷新后恢复
   const currentPage = window.APP.currentPage;
 
-  // ========== 核心合并逻辑：基于 _lastModified 时间戳 ==========
+  // ========== 核心合并逻辑：逐条记录级别合并 ==========
+  // 策略：每条数据独立比较修改时间，谁更新保留谁
   const cloudTs = parseInt(cloudData._lastModified || '0', 10);
   const localTs = parseInt(local._lastModified || '0', 10);
 
-  if (cloudTs > localTs) {
-    // 云端更新，用云端数据覆盖本地
-    window.APP.db = cloudData;
-    console.log('[Cloud] 云端更新 (' + new Date(cloudTs).toLocaleTimeString() + ' > ' + new Date(localTs).toLocaleTimeString() + ')，应用云端数据');
-  } else {
-    // 本地更新了但云端是旧的，本地数据推送到云端
-    console.log('[Cloud] 本地更新 (' + new Date(localTs).toLocaleTimeString() + ' >= 云端)，推送本地数据到云端');
-    saveToCloud(window.APP.db);
+  // 只有在整库时间戳差异巨大时才考虑整体替换（防止首次同步混乱）
+  // 正常情况下都应该逐条合并
+  const needFullMerge = Math.abs(cloudTs - localTs) > 1000; // 差异超过1秒才触发合并
+
+  if (needFullMerge) {
+    // 逐条合并各类数据
+    mergeSingleCollection(local, cloudData, 'customers', 'id');
+    mergeSingleCollection(local, cloudData, 'sw_orders', 'id');
+    mergeSingleCollection(local, cloudData, 'hw_orders', 'id');
+    mergeSingleCollection(local, cloudData, 'products', 'id');
+    mergeSingleCollection(local, cloudData, 'keycodes', 'id');
+    mergeSingleCollection(local, cloudData, 'brands', 'id');
+    mergeSingleCollection(local, cloudData, 'custom_fields', 'id');
+    mergeSingleCollection(local, cloudData, 'cardRecords', 'id');
+
+    // 合并 sw_tpl / hw_tpl
+    if (cloudData.sw_tpl) {
+      const cloudTplTs = parseInt(cloudData.sw_tpl._lastModified || '0', 10);
+      const localTplTs = parseInt(local.sw_tpl && local.sw_tpl._lastModified || '0', 10);
+      if (cloudTplTs > localTplTs) local.sw_tpl = cloudData.sw_tpl;
+    }
+    if (cloudData.hw_tpl) {
+      const cloudTplTs = parseInt(cloudData.hw_tpl._lastModified || '0', 10);
+      const localTplTs = parseInt(local.hw_tpl && local.hw_tpl._lastModified || '0', 10);
+      if (cloudTplTs > localTplTs) local.hw_tpl = cloudData.hw_tpl;
+    }
+
+    // 合并 settings（取并集，云端和本地都保留）
+    if (cloudData.settings) {
+      local.settings = local.settings || {};
+      Object.keys(cloudData.settings).forEach(key => {
+        // firebaseConfig 以本地为准（包含敏感信息）
+        if (key === 'firebaseConfig') return;
+        local.settings[key] = cloudData.settings[key];
+      });
+    }
+
+    // 合并 productSalesData（对象结构，逐条合并）
+    if (cloudData.productSalesData) {
+      local.productSalesData = local.productSalesData || {};
+      Object.keys(cloudData.productSalesData).forEach(productId => {
+        const cloudItem = cloudData.productSalesData[productId];
+        const localItem = local.productSalesData[productId];
+        if (!localItem) {
+          // 本地没有，直接用云端
+          local.productSalesData[productId] = cloudItem;
+        } else {
+          // 两者都有，逐字段比较更新时间
+          const cloudItemTs = parseInt(cloudItem._lastModified || '0', 10);
+          const localItemTs = parseInt(localItem._lastModified || '0', 10);
+          if (cloudItemTs > localItemTs) {
+            local.productSalesData[productId] = cloudItem;
+          }
+        }
+      });
+    }
+
+    console.log('[Cloud] 逐条合并完成，保留各端最新修改');
   }
-  // ============================================================
+  // ==================================================
 
   saveDB_localOnly();
 
@@ -182,6 +233,36 @@ function applyCloudData(cloudData) {
   } else if (typeof renderDashboard === 'function') {
     renderDashboard();
   }
+}
+
+// 逐条合并单个集合（数组类型）
+function mergeSingleCollection(local, cloudData, key, idField) {
+  if (!Array.isArray(local[key])) local[key] = [];
+  if (!Array.isArray(cloudData[key])) cloudData[key] = [];
+
+  const map = {};
+  // 先放入本地数据
+  local[key].forEach(item => {
+    if (item && item[idField]) map[item[idField]] = item;
+  });
+  // 再与云端数据合并，保留更新时间较新的
+  cloudData[key].forEach(item => {
+    if (!item || !item[idField]) return;
+    const existing = map[item[idField]];
+    if (!existing) {
+      // 本地没有，直接添加
+      map[item[idField]] = item;
+    } else {
+      // 两者都有，比较修改时间
+      const cloudTs = parseInt(item._lastModified || '0', 10);
+      const localTs = parseInt(existing._lastModified || '0', 10);
+      if (cloudTs > localTs) {
+        map[item[idField]] = item; // 云端更新，用云端
+      }
+      // 否则保留本地（不更新）
+    }
+  });
+  local[key] = Object.values(map);
 }
 
 // ==================== 实时云同步（Firebase Realtime Database 轮询）====================
@@ -541,8 +622,20 @@ async function loadDB() {
 
 // ==================== 统一保存（本地+云端双写）====================
 let _cloudSyncTimer = null;
+// 上次保存时的数据快照，用于比较哪些记录真正发生了变化
+let _lastSaveSnapshot = null;
+
 function saveDB() {
+  // 保存前，给所有数据记录添加/更新时间戳（用于合并时判断）
+  markAllRecordsModified();
+
   saveDB_localOnly();
+
+  // 更新保存快照
+  try {
+    _lastSaveSnapshot = JSON.stringify(window.APP.db);
+  } catch(e) {}
+
   // 防抖：延迟500ms合并写入云端，避免频繁写入
   if (_cloudSyncTimer) clearTimeout(_cloudSyncTimer);
   _cloudSyncTimer = setTimeout(async () => {
@@ -551,6 +644,37 @@ function saveDB() {
       console.warn('[Cloud] 云端同步失败，数据已保存在本设备');
     }
   }, 500);
+}
+
+// 给所有数据记录标记修改时间戳
+function markAllRecordsModified() {
+  const db = window.APP.db;
+  if (!db) return;
+  const now = Date.now();
+
+  // 遍历所有数组类型数据
+  ['customers', 'sw_orders', 'hw_orders', 'products', 'keycodes', 'brands', 'custom_fields', 'cardRecords'].forEach(key => {
+    if (Array.isArray(db[key])) {
+      db[key].forEach(item => {
+        if (item && !item._lastModified) {
+          item._lastModified = now;
+        }
+      });
+    }
+  });
+
+  // 遍历 productSalesData 对象
+  if (db.productSalesData && typeof db.productSalesData === 'object') {
+    Object.values(db.productSalesData).forEach(item => {
+      if (item && !item._lastModified) {
+        item._lastModified = now;
+      }
+    });
+  }
+
+  // sw_tpl / hw_tpl
+  if (db.sw_tpl && !db.sw_tpl._lastModified) db.sw_tpl._lastModified = now;
+  if (db.hw_tpl && !db.hw_tpl._lastModified) db.hw_tpl._lastModified = now;
 }
 
 

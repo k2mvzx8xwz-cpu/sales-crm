@@ -1038,7 +1038,8 @@ function saveOrder(editId = null) {
     orderDate,
     approvalStatus: document.getElementById('of-approvalStatus')?.value || '',
     approvalNote: document.getElementById('of-approvalNote')?.value || '',
-    note: document.getElementById('of-note')?.value || ''
+    note: document.getElementById('of-note')?.value || '',
+    _lastModified: Date.now() // 添加时间戳用于合并
   };
 
   if (type === 'software') {

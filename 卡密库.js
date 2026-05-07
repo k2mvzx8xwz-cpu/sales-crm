@@ -293,7 +293,8 @@ function saveCard(editId = null) {
       createdAt: Date.now(),
       relatedOrderNo: '',
       relatedWechatName: '',
-      relatedWechatId: ''
+      relatedWechatId: '',
+      _lastModified: Date.now() // 添加时间戳用于合并
     };
 
     // 如果新增时状态直接为"已使用"，记录使用时间并从今天计算有效期
@@ -375,6 +376,7 @@ function doBatchImportCards() {
   let added = 0, skipped = 0;
 
   const now = getFullDatetime();
+  const nowTs = Date.now();
   lines.forEach(code => {
     if (existing.has(code)) { skipped++; return; }
     db.cards.push({
@@ -390,7 +392,8 @@ function doBatchImportCards() {
       relatedOrderNo: '',
       relatedWechatName: '',
       relatedWechatId: '',
-      createdAt: Date.now()
+      createdAt: nowTs,
+      _lastModified: nowTs  // 添加时间戳用于合并
     });
     added++;
   });
