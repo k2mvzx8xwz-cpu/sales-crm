@@ -80,8 +80,7 @@ function renderCustomers() {
                   <td>${(customerPage-1)*15+idx+1}</td>
                   <td><a href="#" class="link" onclick="showCustomerDetail('${c.id}')">${c.wechatName || '-'}</a></td>
                   <td>
-                    <span>${c.wechatId || '-'}</span>
-                    ${c.wechatId ? `<button class="btn-copy-inline" onclick="copyToClipboard('${c.wechatId}','微信号已复制')" title="复制微信号">⎘</button>` : ''}
+                    <span style="cursor:pointer" onclick="copyToClipboard('${c.wechatId || ''}','微信号已复制')" title="点击复制">${c.wechatId || '-'}</span>
                   </td>
                   <td>${c.phone || '-'}</td>
                   <td><span class="badge ${c.type === 'software' ? 'badge-blue' : 'badge-green'}">${c.type === 'software' ? '软件' : '硬件'}</span></td>

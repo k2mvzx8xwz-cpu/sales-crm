@@ -703,7 +703,7 @@ button { cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .badge-warning { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.2); }
 .badge-danger { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); }
 .badge-gray { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.2); }
-.badge-success { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.2); }
+.badge-success { background: rgba(6,130,87,0.25); color: #34d399; border: 1px solid rgba(6,130,87,0.4); }
 
 /* ==================== 分页 ==================== */
 .pager {

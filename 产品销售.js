@@ -180,7 +180,12 @@ function saveProductSales(id) {
     status: document.getElementById('psd-status')?.value || 'draft',
     _lastModified: Date.now() // 添加时间戳用于合并
   };
-  saveDB();
+  // 立即保存到本地并强制同步到云端（不等待防抖）
+  saveDB_localOnly();
+  // 立即推送到云端
+  if (window.APP_FIREBASE_INITIALIZED) {
+    saveToCloud(window.APP.db);
+  }
   closeModal();
   showToast('产品销售数据已保存');
   renderProductSales();
@@ -237,7 +242,12 @@ function execBatchSetStatus() {
       db.productSalesData[id]._lastModified = now; // 更新时间戳
     }
   });
-  saveDB();
+  // 立即保存到本地并强制同步到云端（不等待防抖）
+  saveDB_localOnly();
+  // 立即推送到云端
+  if (window.APP_FIREBASE_INITIALIZED) {
+    saveToCloud(window.APP.db);
+  }
   closeModal();
   showToast(`已批量修改 ${psSelected.length} 个商品状态`);
   psSelected = [];
