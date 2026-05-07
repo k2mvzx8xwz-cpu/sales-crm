@@ -242,11 +242,20 @@ function execBatchSetStatus() {
       db.productSalesData[id]._lastModified = now; // 更新时间戳
     }
   });
-  // 立即保存到本地并强制同步到云端（不等待防抖）
+  // 更新整库时间戳，确保云端同步时能正确合并
+  db._lastModified = now;
+  // 立即保存到本地
   saveDB_localOnly();
-  // 立即推送到云端
+  // 立即推送到云端（等待完成）
   if (window.APP_FIREBASE_INITIALIZED) {
-    saveToCloud(window.APP.db);
+    (async () => {
+      try {
+        await saveToCloud(window.APP.db);
+        console.log('[批量修改状态] 云端同步完成');
+      } catch (e) {
+        console.error('[批量修改状态] 云端同步失败:', e.message);
+      }
+    })();
   }
   closeModal();
   showToast(`已批量修改 ${psSelected.length} 个商品状态`);
