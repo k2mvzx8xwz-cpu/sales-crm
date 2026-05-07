@@ -134,8 +134,9 @@ async function saveToCloud(data) {
   if (!url) { console.error('[Cloud] saveToCloud: URL 为空'); return false; }
   try {
     window.APP_CLOUD_LAST_SAVE_TIME = Date.now();
-    // 写入前给整库打时间戳，供合并时判断谁更新
-    const dataToSave = Object.assign({}, data, { _lastModified: Date.now() });
+    // 注意：不覆盖 _lastModified，保留本地设置的记录级时间戳
+    // 这样 mergeData 可以正确判断哪边的数据更新
+    const dataToSave = Object.assign({}, data);
     const resp = await fetchWithTimeout(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
