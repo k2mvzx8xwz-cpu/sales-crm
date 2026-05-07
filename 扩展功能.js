@@ -1,6 +1,6 @@
 /**
- * 扩展功能.js - 销售客户管理系统 v3.0.0
- * 职责：换卡功能、换设备功能、物流查询
+ * 扩展功能.js - 销售客户管理系统 v5.16.0
+ * 职责：换卡功能、换设备功能、物流查询、数据备份导出导入
  */
 
 // ==================== 换卡功能 ====================
@@ -343,6 +343,334 @@ function getExpressCode(name) {
   };
   return map[name] || 'auto';
 }
+
+// ==================== 数据备份与导出导入 ====================
+// 显示数据管理面板
+function showDataManagement() {
+  const db = window.APP.db;
+  const lastBackup = localStorage.getItem('crm_lastBackup') || '暂无记录';
+  const cats = ['temp','monthly','quarterly','halfyear','yearly','permanent'];
+  const catUnusedCounts = {};
+  cats.forEach(cat => {
+    catUnusedCounts[cat] = (db.cards||[]).filter(c => c.category === cat && c.status === 'unused').length;
+  });
+  const totalUnused = (db.cards||[]).filter(c => c.status === 'unused').length;
+
+  const content = `
+    <div style="display:grid;gap:16px">
+      <!-- 备份卡片 -->
+      <div style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:18px">💾</span>
+          <h4 style="margin:0">数据备份</h4>
+        </div>
+        <div style="color:var(--text-muted);font-size:12px;margin-bottom:12px">
+          上次备份时间：<span id="dm-lastBackup" style="color:var(--link-color)">${lastBackup}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="doManualBackup()" class="btn-primary" style="display:flex;align-items:center;gap:6px">
+            <span>📦</span> 立即备份
+          </button>
+          <label class="btn-secondary" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <span>📂</span> 导入备份
+            <input type="file" accept=".json" style="display:none" onchange="doImportBackup(this)">
+          </label>
+        </div>
+      </div>
+
+      <!-- 导出卡片 -->
+      <div style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:18px">📤</span>
+          <h4 style="margin:0">数据导出</h4>
+        </div>
+        <div style="color:var(--text-muted);font-size:12px;margin-bottom:12px">
+          将数据导出为JSON文件，可用于数据迁移或存档
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="doExportAllData()" class="btn-primary" style="display:flex;align-items:center;gap:6px">
+            <span>⬇</span> 导出全部数据
+          </button>
+          <button onclick="showExportOptions()" class="btn-secondary" style="display:flex;align-items:center;gap:6px">
+            <span>🎯</span> 选择性导出
+          </button>
+        </div>
+      </div>
+
+      <!-- 导入卡片 -->
+      <div style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:18px">📥</span>
+          <h4 style="margin:0">数据导入</h4>
+        </div>
+        <div style="color:var(--text-muted);font-size:12px;margin-bottom:12px">
+          从JSON文件导入数据，支持合并或覆盖模式
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="btn-secondary" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <span>📂</span> 导入JSON数据
+            <input type="file" accept=".json" style="display:none" onchange="doImportData(this)">
+          </label>
+        </div>
+      </div>
+
+      <!-- 数据统计 -->
+      <div style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:18px">📊</span>
+          <h4 style="margin:0">数据统计</h4>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">客户总数</div>
+            <div style="color:var(--link-color);font-size:18px;font-weight:600">${(db.customers||[]).length}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">订单总数</div>
+            <div style="color:var(--link-color);font-size:18px;font-weight:600">${(db.orders||[]).length}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">卡密总数</div>
+            <div style="color:var(--link-color);font-size:18px;font-weight:600">${(db.cards||[]).length}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">卡密库存</div>
+            <div style="color:#10b981;font-size:18px;font-weight:600">${totalUnused}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">商品总数</div>
+            <div style="color:var(--link-color);font-size:18px;font-weight:600">${(db.products||[]).length}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-primary);border-radius:6px">
+            <div style="color:var(--text-muted);font-size:11px">无效卡密</div>
+            <div style="color:#ef4444;font-size:18px;font-weight:600">${(db.cards||[]).filter(c=>c.status==='invalid'||c.status==='expired').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="color:#f59e0b;font-size:12px;background:rgba(245,158,11,0.1);border-radius:6px;padding:8px 12px;border-left:3px solid #f59e0b">
+        ⚠️ 导入数据会合并现有数据，如需完全覆盖请先备份当前数据
+      </div>
+    </div>
+  `;
+
+  showModal('数据管理', content, `<button onclick="closeModal()" class="btn-secondary">关闭</button>`, 'lg');
+}
+
+// 显示导出选项
+function showExportOptions() {
+  const content = `
+    <div style="display:grid;gap:12px">
+      <div class="export-option" onclick="doExportData('customers')">
+        <span class="export-icon">👥</span>
+        <div><div style="font-weight:600">客户数据</div><div style="font-size:12px;color:var(--text-muted)">导出所有客户信息</div></div>
+      </div>
+      <div class="export-option" onclick="doExportData('orders')">
+        <span class="export-icon">📋</span>
+        <div><div style="font-weight:600">订单数据</div><div style="font-size:12px;color:var(--text-muted)">导出所有订单记录</div></div>
+      </div>
+      <div class="export-option" onclick="doExportData('cards')">
+        <span class="export-icon">🔑</span>
+        <div><div style="font-weight:600">卡密数据</div><div style="font-size:12px;color:var(--text-muted)">导出所有卡密信息</div></div>
+      </div>
+      <div class="export-option" onclick="doExportData('products')">
+        <span class="export-icon">📦</span>
+        <div><div style="font-weight:600">商品数据</div><div style="font-size:12px;color:var(--text-muted)">导出所有商品信息</div></div>
+      </div>
+    </div>
+  `;
+  showModal('选择性导出', content, `<button onclick="closeModal()" class="btn-secondary">取消</button>`);
+}
+
+// 执行手动备份
+function doManualBackup() {
+  const db = window.APP.db;
+  const backupData = JSON.parse(JSON.stringify(db));
+  backupData._backupMeta = {
+    version: 'v5.16.0',
+    time: getFullDatetime(),
+    timestamp: Date.now(),
+    type: 'manual'
+  };
+
+  const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sales_crm_backup_${formatDate(new Date(), 'YYYYMMDD_HHmmss')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  localStorage.setItem('crm_lastBackup', getFullDatetime());
+  document.getElementById('dm-lastBackup').textContent = getFullDatetime();
+  showToast('备份已保存到本地', 'success');
+}
+
+// 执行导入备份（覆盖模式）
+function doImportBackup(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  if (!confirm(`确定要导入备份文件 "${file.name}" 吗？\n这将完全覆盖当前所有数据！\n建议先手动备份一次。`)) {
+    fileInput.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data._backupMeta) {
+        showToast('无效的备份文件格式', 'error');
+        return;
+      }
+
+      // 覆盖所有数据
+      const keys = ['customers', 'orders', 'cards', 'products', 'cardRecords', 'settings', 'custom_fields', 'brands', 'sw_tpl', 'hw_tpl', 'productSalesData'];
+      keys.forEach(key => {
+        if (data[key] !== undefined) {
+          window.APP.db[key] = data[key];
+        }
+      });
+
+      // 保存到localStorage
+      keys.forEach(key => {
+        localStorage.setItem('crm_' + key, JSON.stringify(window.APP.db[key] || []));
+      });
+
+      // 刷新页面以重新渲染
+      showToast('数据已成功导入，正在刷新...', 'success');
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+      showToast('导入失败：' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  fileInput.value = '';
+}
+
+// 导出全部数据
+function doExportAllData() {
+  const db = window.APP.db;
+  const exportData = JSON.parse(JSON.stringify(db));
+  exportData._exportMeta = {
+    version: 'v5.16.0',
+    time: getFullDatetime(),
+    timestamp: Date.now(),
+    type: 'full'
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sales_crm_export_${formatDate(new Date(), 'YYYYMMDD_HHmmss')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据导出成功', 'success');
+}
+
+// 选择性导出数据
+function doExportData(type) {
+  const db = window.APP.db;
+  const data = {
+    _exportMeta: {
+      version: 'v5.16.0',
+      time: getFullDatetime(),
+      timestamp: Date.now(),
+      type: type
+    }
+  };
+
+  switch(type) {
+    case 'customers': data.customers = db.customers || []; break;
+    case 'orders': data.orders = db.orders || []; break;
+    case 'cards': data.cards = db.cards || []; break;
+    case 'products': data.products = db.products || []; break;
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sales_crm_${type}_${formatDate(new Date(), 'YYYYMMDD_HHmmss')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeModal();
+  showToast(type + ' 数据导出成功', 'success');
+}
+
+// 导入JSON数据（合并模式）
+function doImportData(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (!confirm(`确定要导入 "${file.name}" 吗？\n数据将合并到现有数据中。`)) {
+        fileInput.value = '';
+        return;
+      }
+
+      let mergedCount = 0;
+      const keys = ['customers', 'orders', 'cards', 'products', 'cardRecords'];
+
+      keys.forEach(key => {
+        if (Array.isArray(data[key])) {
+          const existingIds = new Set((window.APP.db[key]||[]).map(item => item.id));
+          data[key].forEach(item => {
+            if (!existingIds.has(item.id)) {
+              window.APP.db[key].push(item);
+              mergedCount++;
+            }
+          });
+          localStorage.setItem('crm_' + key, JSON.stringify(window.APP.db[key]));
+        }
+      });
+
+      showToast(`成功合并 ${mergedCount} 条新数据`, 'success');
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+      showToast('导入失败：' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  fileInput.value = '';
+}
+
+// 自动备份检查（每天首次打开时自动备份）
+function checkAutoBackup() {
+  const lastAutoBackup = localStorage.getItem('crm_lastAutoBackup') || '';
+  const today = formatDate(new Date(), 'YYYY-MM-DD');
+
+  if (lastAutoBackup !== today) {
+    const db = window.APP.db;
+    const backupData = JSON.parse(JSON.stringify(db));
+    backupData._backupMeta = {
+      version: 'v5.16.0',
+      time: getFullDatetime(),
+      timestamp: Date.now(),
+      type: 'auto'
+    };
+
+    const backups = JSON.parse(localStorage.getItem('crm_autoBackups') || '[]');
+    backups.push({
+      date: today,
+      time: getFullDatetime(),
+      data: backupData
+    });
+
+    if (backups.length > 7) backups.shift();
+    localStorage.setItem('crm_autoBackups', JSON.stringify(backups));
+    localStorage.setItem('crm_lastAutoBackup', today);
+    console.log('[自动备份] 今日自动备份已完成');
+  }
+}
+
+setTimeout(checkAutoBackup, 2000);
 
 
 

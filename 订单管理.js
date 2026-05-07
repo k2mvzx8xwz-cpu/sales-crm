@@ -1,11 +1,13 @@
 /**
- * 订单管理.js - 销售客户管理系统 v3.3.1
+ * 订单管理.js - 销售客户管理系统 v5.16.0
  * 职责：订单列表、新增/编辑/删除/详情、软件+硬件订单
  * 调整：1.软件列表卡密+剩余时长独立列（不在产品名下）2.购买日期精确到时分秒
  *       3.微信号列移出订单列表（腾空间给卡密列）4.所有列表页显示序号
  *       5.工作台统计卡片点击跳转明细 6.商品客户展示页显示商品类型
  *       7.数据统计明细表格显示序号 8.订单类型切换字段完全同步
  *       9.修复旧订单卡密显示为空（cardId反查卡密库，一次性回填cardCode）
+ *       10.新增软件订单分类标签点击筛选 11.新增软件订单微信号列
+ *       12.新增硬件订单添加时间字段 13.新增订单列表点击排序功能
  */
 
 let orderPage = 1;
@@ -50,6 +52,9 @@ function renderOrders() {
 
   if (orderFilter !== 'all') list = list.filter(o => o.type === orderFilter);
   if (orderKeyword) list = filterList(list, orderKeyword, ['orderNo', 'wechatName', 'customerName', 'productName', 'wechatId']);
+
+  // 应用排序
+  list = sortList(list, 'orders');
 
   const pager = paginate(list, orderPage, 15);
 
@@ -97,19 +102,19 @@ function renderOrders() {
           <thead>
             <tr>
               <th style="width:40px;"><input type="checkbox" onchange="toggleOrderSelectAll(this)" ${pager.items.length===0?'disabled':''}></th>
-              <th>序号</th>
-              <th>订单号</th>
-              <th>微信昵称</th>
-              <th>产品名称</th>
-              <th class="sw-col" style="${swColStyle}">卡密</th>
-              <th class="hw-col" style="${hwColStyle}">接口类型</th>
-              <th>金额</th>
-              <th>数量</th>
-              <th class="sw-col" style="${swColStyle}">分类</th>
-              <th class="hw-col" style="${hwColStyle}">快递公司</th>
-              <th class="hw-col" style="${hwColStyle}">物流单号</th>
-              <th>购买日期</th>
-              <th class="sw-col" style="${swColStyle}">有效期至</th>
+              <th class="sortable-header" data-field="seq" data-page="orders" data-type="number" title="点击排序">序号 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="orderNo" data-page="orders" data-type="string" title="点击排序">订单号 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="wechatName" data-page="orders" data-type="string" title="点击排序">微信昵称 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="productName" data-page="orders" data-type="string" title="点击排序">产品名称 <span class="sort-icon">↕</span></th>
+              <th class="sw-col sortable-header" data-field="cardCode" data-page="orders" data-type="string" style="${swColStyle}" title="点击排序">卡密 <span class="sort-icon">↕</span></th>
+              <th class="hw-col sortable-header" data-field="portType" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">接口类型 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="totalAmount" data-page="orders" data-type="number" title="点击排序">金额 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="qty" data-page="orders" data-type="number" title="点击排序">数量 <span class="sort-icon">↕</span></th>
+              <th class="sw-col sortable-header" data-field="cardCategory" data-page="orders" data-type="string" style="${swColStyle}" title="点击排序">分类 <span class="sort-icon">↕</span></th>
+              <th class="hw-col sortable-header" data-field="expressCompany" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">快递公司 <span class="sort-icon">↕</span></th>
+              <th class="hw-col sortable-header" data-field="trackingNo" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">物流单号 <span class="sort-icon">↕</span></th>
+              <th class="sortable-header" data-field="orderDate" data-page="orders" data-type="date" title="点击排序">购买日期 <span class="sort-icon">↕</span></th>
+              <th class="sw-col sortable-header" data-field="expireDate" data-page="orders" data-type="date" style="${swColStyle}" title="点击排序">有效期至 <span class="sort-icon">↕</span></th>
               <th class="sw-col" style="${swColStyle}">剩余时间</th>
               <th>操作</th>
             </tr>
@@ -177,6 +182,7 @@ function renderOrders() {
     </div>
   `;
   renderPager('order-pager', pager, (p) => { orderPage = p; renderOrders(); });
+  bindSortEvents('orders');
 }
 
 function setOrderFilter(f) {

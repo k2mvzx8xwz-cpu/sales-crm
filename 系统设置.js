@@ -300,8 +300,8 @@ function renderSettings() {
       <div class="section-card-header"><span>💾 数据管理</span></div>
       <div style="padding:16px;display:flex;gap:12px;flex-wrap:wrap;">
         <div>
-          <button class="btn-primary" onclick="exportData()">📤 导出数据</button>
-          <div class="form-hint" style="margin-top:4px">导出所有数据为JSON备份文件</div>
+          <button class="btn-primary" onclick="showDataManagement()">🗂️ 打开数据管理中心</button>
+          <div class="form-hint" style="margin-top:4px">支持备份、导出、导入功能</div>
         </div>
         <div>
           <input type="file" id="import-file" accept=".json" onchange="importData(this)" style="display:none">

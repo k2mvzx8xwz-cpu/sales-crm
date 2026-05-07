@@ -1,10 +1,10 @@
 /**
- * 核心工具.js - 销售客户管理系统 v4.0.0
+ * 核心工具.js - 销售客户管理系统 v5.16.0
  * 职责：数据存储（Firebase云同步+localStorage本地备份）、工具函数、全局状态、初始化
  * 云同步方式：Firebase REST API（不加载 SDK，绕过国内网络限制）
  */
-// 版本标记：20260503-1730（修复：添加强制同步按钮、清空云端数据功能）
-console.log('[核心工具.js] 已加载，版本: 20260502-1430');
+// 版本标记：20260507-1300（新增：订单排序功能）
+console.log('[核心工具.js] 已加载，版本: 20260507-1300');
 
 // ==================== 全局数据存储层（统一存储，兼容云端同步）====================
 window.DB = {
@@ -1270,4 +1270,118 @@ function changeUserSecret(question, answer) {
   localStorage.setItem('auth_users', JSON.stringify(users));
   showToast('安全问题已设置', 'success');
   return true;
+}
+
+// ==================== 通用排序功能 ====================
+// 排序状态管理：{ pageKey: { field: 'xxx', direction: 'asc'|'desc' } }
+window._sortState = window._sortState || {};
+
+// 点击表头排序
+function handleSortClick(field, pageKey, dataType) {
+  if (!window._sortState[pageKey]) window._sortState[pageKey] = {};
+  const state = window._sortState[pageKey];
+
+  if (state.field === field) {
+    state.direction = state.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.field = field;
+    state.direction = 'asc';
+  }
+
+  // 更新表头图标
+  document.querySelectorAll(`#page-${pageKey} .sortable-header`).forEach(th => {
+    const f = th.dataset.field;
+    const s = window._sortState[pageKey];
+    const isActive = s && s.field === f;
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = isActive ? (s.direction === 'asc' ? '↑' : '↓') : '↕';
+    th.classList.toggle('sort-active', isActive);
+  });
+}
+
+// 对列表排序
+function sortList(list, pageKey) {
+  const state = window._sortState[pageKey];
+  if (!state || !state.field) return list;
+
+  return [...list].sort((a, b) => {
+    if (state.field === 'seq') return 0;
+
+    let valA = a[state.field];
+    let valB = b[state.field];
+
+    // 卡密库剩余天数排序
+    if (state.field === 'remainingDays') {
+      valA = a.category === 'permanent' ? 99999 : calcRemainingDays(a.expireDate) ?? -99999;
+      valB = b.category === 'permanent' ? 99999 : calcRemainingDays(b.expireDate) ?? -99999;
+      const result = valA - valB;
+      return state.direction === 'asc' ? result : -result;
+    }
+
+    // 分类排序（自定义顺序）
+    if (state.field === 'category' || state.field === 'cardCategory') {
+      const order = { temp: 1, monthly: 2, quarterly: 3, halfyear: 4, yearly: 5, permanent: 6, '': 99 };
+      valA = order[a[state.field]] || 99;
+      valB = order[b[state.field]] || 99;
+      const result = valA - valB;
+      return state.direction === 'asc' ? result : -result;
+    }
+
+    // 状态排序
+    if (state.field === 'status') {
+      const order = { unused: 1, used: 2, replaced: 3, expired: 4, invalid: 5, '': 99 };
+      valA = order[a.status] || 99;
+      valB = order[b.status] || 99;
+      const result = valA - valB;
+      return state.direction === 'asc' ? result : -result;
+    }
+
+    // 客户类型排序
+    if (state.field === 'type') {
+      const order = { software: 1, hardware: 2 };
+      valA = order[a.type] || 99;
+      valB = order[b.type] || 99;
+      const result = valA - valB;
+      return state.direction === 'asc' ? result : -result;
+    }
+
+    // 通用处理
+    if (valA == null && valB == null) return 0;
+    if (valA == null) return state.direction === 'asc' ? -1 : 1;
+    if (valB == null) return state.direction === 'asc' ? 1 : -1;
+
+    let result;
+    if (state.field === 'createdAt' || state.field === 'orderDate' || state.field === 'addedTime') {
+      valA = typeof valA === 'number' ? valA : new Date(valA).getTime();
+      valB = typeof valB === 'number' ? valB : new Date(valB).getTime();
+      result = valA - valB;
+    } else if (state.field === 'totalAmount' || state.field === 'price' || state.field === 'profit' || state.field === 'qty') {
+      result = (Number(valA) || 0) - (Number(valB) || 0);
+    } else {
+      valA = String(valA || '').toLowerCase();
+      valB = String(valB || '').toLowerCase();
+      result = valA.localeCompare(valB, 'zh-CN');
+    }
+
+    return state.direction === 'asc' ? result : -result;
+  });
+}
+
+// 绑定排序事件
+function bindSortEvents(pageKey) {
+  setTimeout(() => {
+    document.querySelectorAll(`#page-${pageKey} .sortable-header`).forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const field = th.dataset.field;
+        const dataType = th.dataset.type;
+        handleSortClick(field, pageKey, dataType);
+        if (pageKey === 'customers') renderCustomers();
+        else if (['orders', 'software', 'hardware'].includes(pageKey)) renderOrders();
+        else if (pageKey === 'cards') renderCards();
+        else if (pageKey === 'products') renderProducts();
+        else if (pageKey === 'product-sales') renderProductSales();
+      });
+    });
+  }, 50);
 }
