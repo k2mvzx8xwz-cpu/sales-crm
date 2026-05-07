@@ -1190,8 +1190,8 @@ function saveOrder(editId = null) {
   closeModal();
   renderOrders();
   
-  // 重置防重复提交标志
-  setTimeout(() => { _saveOrderInProgress = false; }, 500);
+  // 重置防重复提交标志（延迟1.5秒，防止快速重复点击）
+  setTimeout(() => { _saveOrderInProgress = false; }, 1500);
 }
 
 function showEditOrderModal(id) {

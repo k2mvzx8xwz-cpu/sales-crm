@@ -222,7 +222,7 @@ function batchSetStatus() {
      <button onclick="execBatchSetStatus()" class="btn-primary">确认修改</button>`);
 }
 
-function execBatchSetStatus() {
+async function execBatchSetStatus() {
   const db = window.APP.db;
   const newStatus = document.getElementById('batch-status-select')?.value || 'draft';
   const now = Date.now();
@@ -248,15 +248,18 @@ function execBatchSetStatus() {
   saveDB_localOnly();
   // 立即推送到云端（等待完成）
   if (window.APP_FIREBASE_INITIALIZED) {
-    (async () => {
-      try {
-        await saveToCloud(window.APP.db);
-        console.log('[批量修改状态] 云端同步完成');
-      } catch (e) {
-        console.error('[批量修改状态] 云端同步失败:', e.message);
-      }
-    })();
+    try {
+      await saveToCloud(window.APP.db);
+      console.log('[批量修改状态] 云端同步完成');
+      showToast('批量修改成功，已同步到云端', 'success');
+    } catch (e) {
+      console.error('[批量修改状态] 云端同步失败:', e.message);
+      showToast('云端同步失败', 'error');
+    }
+  } else {
+    showToast('批量修改成功', 'success');
   }
+  closeModal();
   closeModal();
   showToast(`已批量修改 ${psSelected.length} 个商品状态`);
   psSelected = [];
