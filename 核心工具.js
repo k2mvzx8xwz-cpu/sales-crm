@@ -201,7 +201,7 @@ function applyCloudData(cloudData) {
       });
     }
 
-    // 合并 productSalesData（对象结构，逐条合并）
+    // 合并 productSalesData（对象结构，逐条合并，时间戳较新的优先）
     if (cloudData.productSalesData) {
       local.productSalesData = local.productSalesData || {};
       Object.keys(cloudData.productSalesData).forEach(productId => {
@@ -211,9 +211,10 @@ function applyCloudData(cloudData) {
           // 本地没有，直接用云端
           local.productSalesData[productId] = cloudItem;
         } else {
-          // 两者都有，逐字段比较更新时间
+          // 两者都有，比较更新时间（时间戳较新的优先）
           const cloudItemTs = parseInt(cloudItem._lastModified || '0', 10);
           const localItemTs = parseInt(localItem._lastModified || '0', 10);
+          // 如果云端较新，使用云端；否则保留本地（优先保护本地新数据）
           if (cloudItemTs > localItemTs) {
             local.productSalesData[productId] = cloudItem;
           }
@@ -518,14 +519,17 @@ function mergeData(local, cloud) {
     const localItem = localPSD[productId];
     const cloudItem = cloudPSD[productId];
     if (!cloudItem) {
+      // 云端没有，使用本地
       result.productSalesData[productId] = localItem;
     } else if (!localItem) {
+      // 本地没有，使用云端
       result.productSalesData[productId] = cloudItem;
     } else {
       // 两者都有，保留时间戳较新的
       const localTs = parseInt(localItem._lastModified || '0', 10);
       const cloudTs = parseInt(cloudItem._lastModified || '0', 10);
-      result.productSalesData[productId] = cloudTs > localTs ? cloudItem : localItem;
+      // 如果时间戳相同或云端较旧，使用本地（优先保护本地新数据）
+      result.productSalesData[productId] = (cloudTs > localTs) ? cloudItem : localItem;
     }
   });
   // settings 以云端为准（firebaseConfig 以本地为准）

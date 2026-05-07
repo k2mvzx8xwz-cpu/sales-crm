@@ -1041,7 +1041,17 @@ function clearSelectedCard() {
 }
 
 // ==================== 保存订单 ====================
+// 防重复提交标志
+let _saveOrderInProgress = false;
+
 function saveOrder(editId = null) {
+  // 防重复提交：检查是否正在保存
+  if (_saveOrderInProgress) {
+    showToast('订单保存中，请稍候...', 'warning');
+    return;
+  }
+  _saveOrderInProgress = true;
+  
   const typeEl = document.querySelector('input[name="of-type"]:checked');
   if (!typeEl) { showToast('请选择订单类型', 'error'); return; }
   const type = typeEl.value;
@@ -1179,6 +1189,9 @@ function saveOrder(editId = null) {
   saveDB();
   closeModal();
   renderOrders();
+  
+  // 重置防重复提交标志
+  setTimeout(() => { _saveOrderInProgress = false; }, 500);
 }
 
 function showEditOrderModal(id) {
