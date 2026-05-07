@@ -106,7 +106,8 @@ function saveProduct(editId = null) {
       costPrice: product.cost || 0,
       agentPrice: 0,
       salePrice: product.price || 0,
-      status: 'draft'
+      status: 'draft',
+      _lastModified: Date.now() // 添加时间戳，用于合并时判断
     };
     showToast('商品已添加');
   }
