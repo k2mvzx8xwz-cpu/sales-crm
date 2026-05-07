@@ -10,17 +10,50 @@ function showChangeCardModal(orderId) {
   if (!order) return;
 
   const unusedCards = (db.cards || []).filter(c => c.status === 'unused');
+  
+  // 计算各分类库存
+  const catStock = {
+    temp: unusedCards.filter(c => c.category === 'temp').length,
+    monthly: unusedCards.filter(c => c.category === 'monthly').length,
+    quarterly: unusedCards.filter(c => c.category === 'quarterly').length,
+    halfyear: unusedCards.filter(c => c.category === 'halfyear').length,
+    yearly: unusedCards.filter(c => c.category === 'yearly').length,
+    permanent: unusedCards.filter(c => c.category === 'permanent').length
+  };
 
   const content = `
     <div style="margin-bottom:16px;padding:12px;background:#0f172a;border-radius:8px;">
       <div style="color:#94a3b8;font-size:12px;margin-bottom:4px">当前卡密</div>
       <div style="color:#7dd3fc;font-family:monospace">${order.cardCode || '(未绑定卡密)'}</div>
     </div>
+    
+    <!-- 卡密库存显示 -->
+    <div style="margin-bottom:16px;padding:10px 12px;background:#1e293b;border-radius:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="color:#94a3b8;font-size:12px">可用库存：</span>
+      <span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:12px;font-size:11px;">临 ${catStock.temp}</span>
+      <span style="background:#dbeafe;color:#2563eb;padding:2px 8px;border-radius:12px;font-size:11px;">月 ${catStock.monthly}</span>
+      <span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:12px;font-size:11px;">季 ${catStock.quarterly}</span>
+      <span style="background:#e0e7ff;color:#4f46e5;padding:2px 8px;border-radius:12px;font-size:11px;">半 ${catStock.halfyear}</span>
+      <span style="background:#fce7f3;color:#db2777;padding:2px 8px;border-radius:12px;font-size:11px;">年 ${catStock.yearly}</span>
+      <span style="background:#f3e8ff;color:#7c3aed;padding:2px 8px;border-radius:12px;font-size:11px;">永 ${catStock.permanent}</span>
+    </div>
+    
     <div class="form-group">
       <label class="form-label required">新卡密</label>
-      <div style="position:relative">
-        <input type="text" class="form-input" id="nc-search" placeholder="输入关键字搜索卡密..." oninput="searchNewCardDropdown(this.value)" autocomplete="off">
-        <div id="nc-dropdown" class="custom-dropdown" style="display:none;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select class="form-select" id="nc-catFilter" style="width:100px" onchange="searchNewCardDropdown(document.getElementById('nc-search').value)">
+          <option value="">全部分类</option>
+          <option value="temp">临时卡</option>
+          <option value="monthly">月卡</option>
+          <option value="quarterly">季卡</option>
+          <option value="halfyear">半年卡</option>
+          <option value="yearly">年卡</option>
+          <option value="permanent">永久卡</option>
+        </select>
+        <div style="position:relative;flex:1;min-width:180px;">
+          <input type="text" class="form-input" id="nc-search" placeholder="输入关键字搜索卡密..." oninput="searchNewCardDropdown(this.value)" autocomplete="off">
+          <div id="nc-dropdown" class="custom-dropdown" style="display:none;"></div>
+        </div>
       </div>
       <input type="hidden" id="nc-cardId">
       <div id="nc-selected" style="display:none;margin-top:8px;padding:8px;background:#0f172a;border-radius:6px;display:flex;align-items:center;gap:8px;">
@@ -44,7 +77,10 @@ function showChangeCardModal(orderId) {
 
 function searchNewCardDropdown(keyword) {
   const db = window.APP.db;
+  const catFilter = document.getElementById('nc-catFilter')?.value || '';
   let cards = (db.cards || []).filter(c => c.status === 'unused');
+  
+  if (catFilter) cards = cards.filter(c => c.category === catFilter);
   if (keyword) cards = cards.filter(c => c.cardCode?.toLowerCase().includes(keyword.toLowerCase()));
 
   const dropdown = document.getElementById('nc-dropdown');
@@ -641,10 +677,13 @@ function doImportData(fileInput) {
   fileInput.value = '';
 }
 
-// 自动备份检查（每天首次打开时自动备份）
+// 自动备份检查（每天首次打开时自动备份，保留最近7天）
 function checkAutoBackup() {
   const lastAutoBackup = localStorage.getItem('crm_lastAutoBackup') || '';
   const today = formatDate(new Date(), 'YYYY-MM-DD');
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const cutoffDate = formatDate(sevenDaysAgo, 'YYYY-MM-DD');
 
   if (lastAutoBackup !== today) {
     const db = window.APP.db;
@@ -657,16 +696,23 @@ function checkAutoBackup() {
     };
 
     const backups = JSON.parse(localStorage.getItem('crm_autoBackups') || '[]');
-    backups.push({
+    
+    // 过滤掉7天以前的备份数据
+    const filteredBackups = backups.filter(b => b.date >= cutoffDate);
+    
+    // 添加今日备份
+    filteredBackups.push({
       date: today,
       time: getFullDatetime(),
       data: backupData
     });
 
-    if (backups.length > 7) backups.shift();
-    localStorage.setItem('crm_autoBackups', JSON.stringify(backups));
+    // 最多保留7天备份（每天1个）
+    while (filteredBackups.length > 7) filteredBackups.shift();
+    
+    localStorage.setItem('crm_autoBackups', JSON.stringify(filteredBackups));
     localStorage.setItem('crm_lastAutoBackup', today);
-    console.log('[自动备份] 今日自动备份已完成');
+    console.log(`[自动备份] 今日自动备份已完成，保留${filteredBackups.length}天备份`);
   }
 }
 

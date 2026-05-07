@@ -60,16 +60,21 @@ function renderCustomers() {
           <thead><tr>
             <th style="width:40px;"><input type="checkbox" onchange="toggleCustomerSelectAll(this)" ${pager.items.length===0?'disabled':''}></th>
             <th>序号</th><th>微信昵称</th><th>微信号</th><th>手机号</th>
-            <th>类型</th><th>购买次数</th><th>累计金额</th><th>客户来源</th><th>添加时间</th><th>操作</th>
+            <th>类型</th><th>状态</th><th>购买次数</th><th>累计金额</th><th>客户来源</th><th>添加时间</th><th>操作</th>
           </tr></thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="11" class="empty-cell">暂无客户数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="12" class="empty-cell">暂无客户数据</td></tr>` :
               pager.items.map((c, idx) => {
                 const swOrders = db.orders.filter(o => o.customerId === c.id && o.type === 'software');
                 const hwOrders = db.orders.filter(o => o.customerId === c.id && o.type === 'hardware');
                 const totalAmt = db.orders.filter(o => o.customerId === c.id && !o.isOldCustomer)
                   .reduce((s, o) => s + (Number(o.totalAmount) || 0), 0);
                 const isChecked = customerSelected.includes(c.id);
+                // 客户状态：默认为有效，status=invalid表示无效
+                const isValid = c.status !== 'invalid';
+                const statusBadge = isValid
+                  ? `<span class="badge badge-success" style="cursor:pointer" onclick="toggleCustomerStatus('${c.id}')" title="点击切换状态">有效</span>`
+                  : `<span class="badge badge-danger" style="cursor:pointer" onclick="toggleCustomerStatus('${c.id}')" title="点击切换状态">无效</span>`;
                 return `<tr>
                   <td><input type="checkbox" class="cust-cb" value="${c.id}" ${isChecked?'checked':''} onchange="onCustomerCheckChange('${c.id}', this.checked)"></td>
                   <td>${(customerPage-1)*15+idx+1}</td>
@@ -80,6 +85,7 @@ function renderCustomers() {
                   </td>
                   <td>${c.phone || '-'}</td>
                   <td><span class="badge ${c.type === 'software' ? 'badge-blue' : 'badge-green'}">${c.type === 'software' ? '软件' : '硬件'}</span></td>
+                  <td>${statusBadge}</td>
                   <td>软件${swOrders.length}次 / 硬件${hwOrders.length}次</td>
                   <td>¥${formatMoney(totalAmt)}</td>
                   <td>${c.source || '-'}</td>
@@ -433,4 +439,27 @@ function batchDeleteCustomers() {
     showToast('批量删除完成');
     renderCustomers();
   },'批量删除客户');
+}
+
+// ==================== 客户状态切换 ====================
+function toggleCustomerStatus(customerId) {
+  const db = window.APP.db;
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) {
+    showToast('客户不存在', 'error');
+    return;
+  }
+  
+  // 切换状态：有效 -> 无效，无效 -> 有效
+  const wasValid = customer.status !== 'invalid';
+  if (wasValid) {
+    customer.status = 'invalid';
+    showToast(`客户「${customer.wechatName}」已标记为无效`);
+  } else {
+    customer.status = '';
+    showToast(`客户「${customer.wechatName}」已恢复为有效`);
+  }
+  customer._lastModified = Date.now();
+  saveDB();
+  renderCustomers();
 }

@@ -101,10 +101,22 @@ function renderCards() {
                 const statusMap = { unused: ['未使用', 'badge-success'], used: ['已使用', 'badge-blue'], replaced: ['已替换', 'badge-gray'] };
                 const [statusLabel, statusBadge] = statusMap[c.status] || ['未知', 'badge-gray'];
 
+                // 根据分类获取颜色样式
+                const catColors = {
+                  temp: { bg: '#fef3c7', text: '#d97706' },
+                  monthly: { bg: '#dbeafe', text: '#2563eb' },
+                  quarterly: { bg: '#dcfce7', text: '#16a34a' },
+                  halfyear: { bg: '#e0e7ff', text: '#4f46e5' },
+                  yearly: { bg: '#fce7f3', text: '#db2777' },
+                  permanent: { bg: '#f3e8ff', text: '#7c3aed' }
+                };
+                const catColor = catColors[c.category] || { bg: '#e5e7eb', text: '#6b7280' };
+                const catBadgeStyle = `background:${catColor.bg};color:${catColor.text};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;`;
+                
                 return `<tr>
                   <td><input type="checkbox" class="card-cb" value="${c.id}" ${isChecked?'checked':''} onchange="onCardCheckChange('${c.id}', this.checked)"></td>
                   <td>${(cardPage-1)*15+idx+1}</td>
-                  <td><span class="badge badge-purple">${getCardCategoryLabel(c.category)}</span></td>
+                  <td><span style="${catBadgeStyle}">${getCardCategoryLabel(c.category)}</span></td>
                   <td>
                     <span class="mono card-text">${c.cardCode}</span>
                     <button class="btn-copy-inline" onclick="copyToClipboard('${c.cardCode.replace(/'/g,"\\'")}','卡密已复制')" title="复制卡密">⎘</button>

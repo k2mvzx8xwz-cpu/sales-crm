@@ -778,10 +778,16 @@ function calcRemainingDays(expireDate) {
 }
 
 // 格式化卡密剩余时间为可读文本（调整9补充）
-function formatRemainingTime(expireDate) {
+function formatRemainingTime(expireDate, cardCategory) {
   if (!expireDate) return '';
   const days = calcRemainingDays(expireDate);
   if (days === null) return '';
+  
+  // 临时卡已过期后直接显示"已到期"
+  if (days < 0 && cardCategory === 'temp') {
+    return `<span style="color:#ef4444;font-size:11px;font-weight:500;">已到期</span>`;
+  }
+  
   if (days < 0) return `<span style="color:#ef4444;font-size:11px">已过期${Math.abs(days)}天</span>`;
   if (days === 0) return `<span style="color:#f59e0b;font-size:11px">今日到期</span>`;
   if (days <= 7) return `<span style="color:#f59e0b;font-size:11px">剩余${days}天</span>`;
@@ -1272,15 +1278,68 @@ function changeUserSecret(question, answer) {
   return true;
 }
 
+// ==================== 卡密分类颜色标签 ====================
+const CARD_CATEGORY_COLORS = {
+  temp: { bg: '#fef3c7', text: '#d97706', label: '临时卡' },
+  monthly: { bg: '#dbeafe', text: '#2563eb', label: '月卡' },
+  quarterly: { bg: '#dcfce7', text: '#16a34a', label: '季卡' },
+  halfyear: { bg: '#e0e7ff', text: '#4f46e5', label: '半年卡' },
+  yearly: { bg: '#fce7f3', text: '#db2777', label: '年卡' },
+  permanent: { bg: '#f3e8ff', text: '#7c3aed', label: '永久卡' }
+};
+
+function getCardCategoryColorStyle(cat) {
+  const c = CARD_CATEGORY_COLORS[cat] || { bg: '#e5e7eb', text: '#6b7280', label: '' };
+  return `background:${c.bg};color:${c.text};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;`;
+}
+
+// ==================== 过期卡密自动处理 ====================
+// 每天首次打开时检查：将过期30天以上的临时卡/已过期卡密自动转为invalid
+function checkAndUpdateExpiredCards() {
+  const db = window.APP.db;
+  if (!db || !db.cards) return;
+  
+  const now = Date.now();
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  let updated = 0;
+  
+  db.cards.forEach(card => {
+    // 只处理已过期且状态还是 used/temp 的卡密
+    if (card.status === 'used' || card.status === 'temp') {
+      if (card.expireDate) {
+        const expireTime = new Date(card.expireDate).getTime();
+        // 过期超过30天且状态不是 invalid
+        if (expireTime + thirtyDays < now && card.status !== 'invalid') {
+          card.status = 'invalid';
+          card._lastModified = now;
+          updated++;
+        }
+      }
+    }
+  });
+  
+  if (updated > 0) {
+    saveDB();
+    console.log(`[自动清理] 已将 ${updated} 张过期30天以上的卡密标记为无效`);
+  }
+}
+
+// 初始化时执行过期检查（延迟3秒，等待数据库加载）
+setTimeout(checkAndUpdateExpiredCards, 3000);
+
 // ==================== 通用排序功能 ====================
 // 排序状态管理：{ pageKey: { field: 'xxx', direction: 'asc'|'desc' } }
 window._sortState = window._sortState || {};
 
 // 点击表头排序
 function handleSortClick(field, pageKey, dataType) {
-  if (!window._sortState[pageKey]) window._sortState[pageKey] = {};
+  // 确保排序状态对象存在
+  if (!window._sortState) window._sortState = {};
+  if (!window._sortState[pageKey]) window._sortState[pageKey] = { field: null, direction: 'asc' };
+  
   const state = window._sortState[pageKey];
 
+  // 如果点击的是同一列，切换升序/降序；否则切换到新列并默认升序
   if (state.field === field) {
     state.direction = state.direction === 'asc' ? 'desc' : 'asc';
   } else {
@@ -1288,13 +1347,15 @@ function handleSortClick(field, pageKey, dataType) {
     state.direction = 'asc';
   }
 
-  // 更新表头图标
-  document.querySelectorAll(`#page-${pageKey} .sortable-header`).forEach(th => {
+  // 更新所有表头的排序图标
+  const headers = document.querySelectorAll(`#page-${pageKey} .sortable-header`);
+  headers.forEach(th => {
     const f = th.dataset.field;
-    const s = window._sortState[pageKey];
-    const isActive = s && s.field === f;
+    const isActive = state.field === f;
     const icon = th.querySelector('.sort-icon');
-    if (icon) icon.textContent = isActive ? (s.direction === 'asc' ? '↑' : '↓') : '↕';
+    if (icon) {
+      icon.textContent = isActive ? (state.direction === 'asc' ? '↑' : '↓') : '↕';
+    }
     th.classList.toggle('sort-active', isActive);
   });
 }
@@ -1370,12 +1431,19 @@ function sortList(list, pageKey) {
 // 绑定排序事件
 function bindSortEvents(pageKey) {
   setTimeout(() => {
-    document.querySelectorAll(`#page-${pageKey} .sortable-header`).forEach(th => {
+    const headers = document.querySelectorAll(`#page-${pageKey} .sortable-header`);
+    headers.forEach(th => {
       th.style.cursor = 'pointer';
-      th.addEventListener('click', () => {
-        const field = th.dataset.field;
-        const dataType = th.dataset.type;
+      // 移除旧事件（防止重复绑定）
+      const newTh = th.cloneNode(true);
+      th.parentNode.replaceChild(newTh, th);
+      
+      newTh.addEventListener('click', function() {
+        const field = this.dataset.field;
+        const dataType = this.dataset.type;
         handleSortClick(field, pageKey, dataType);
+        
+        // 触发对应页面重新渲染
         if (pageKey === 'customers') renderCustomers();
         else if (['orders', 'software', 'hardware'].includes(pageKey)) renderOrders();
         else if (pageKey === 'cards') renderCards();

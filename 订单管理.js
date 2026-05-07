@@ -13,6 +13,7 @@
 let orderPage = 1;
 let orderFilter = 'all';
 let orderKeyword = '';
+let orderCategoryFilter = ''; // 软件订单分类筛选
 let _orderCardCodeBackfilled = false;
 let orderSelected = [];
 
@@ -52,6 +53,8 @@ function renderOrders() {
 
   if (orderFilter !== 'all') list = list.filter(o => o.type === orderFilter);
   if (orderKeyword) list = filterList(list, orderKeyword, ['orderNo', 'wechatName', 'customerName', 'productName', 'wechatId']);
+  // 应用软件订单分类筛选
+  if (orderCategoryFilter) list = list.filter(o => o.type === 'software' && o.cardCategory === orderCategoryFilter);
 
   // 应用排序
   list = sortList(list, 'orders');
@@ -89,6 +92,18 @@ function renderOrders() {
         <input type="text" placeholder="搜索客户/产品..." value="${orderKeyword}"
           oninput="orderKeyword=this.value;orderPage=1;renderOrders()">
       </div>
+    </div>
+    <!-- 软件订单分类标签筛选（仅软件订单页显示） -->
+    <div class="toolbar" id="sw-category-filter" style="${viewMode === 'software' || orderFilter === 'software' ? '' : 'display:none'}">
+      <div class="filter-tabs">
+        <button class="filter-tab ${!orderCategoryFilter?'active':''}" onclick="setOrderCategoryFilter('')">全部分类</button>
+        <button class="filter-tab ${orderCategoryFilter==='temp'?'active':''}" onclick="setOrderCategoryFilter('temp')" style="background:${orderCategoryFilter==='temp'?'#fef3c7':''};color:${orderCategoryFilter==='temp'?'#d97706':''}">临时卡</button>
+        <button class="filter-tab ${orderCategoryFilter==='monthly'?'active':''}" onclick="setOrderCategoryFilter('monthly')" style="background:${orderCategoryFilter==='monthly'?'#dbeafe':''};color:${orderCategoryFilter==='monthly'?'#2563eb':''}">月卡</button>
+        <button class="filter-tab ${orderCategoryFilter==='quarterly'?'active':''}" onclick="setOrderCategoryFilter('quarterly')" style="background:${orderCategoryFilter==='quarterly'?'#dcfce7':''};color:${orderCategoryFilter==='quarterly'?'#16a34a':''}">季卡</button>
+        <button class="filter-tab ${orderCategoryFilter==='halfyear'?'active':''}" onclick="setOrderCategoryFilter('halfyear')" style="background:${orderCategoryFilter==='halfyear'?'#e0e7ff':''};color:${orderCategoryFilter==='halfyear'?'#4f46e5':''}">半年卡</button>
+        <button class="filter-tab ${orderCategoryFilter==='yearly'?'active':''}" onclick="setOrderCategoryFilter('yearly')" style="background:${orderCategoryFilter==='yearly'?'#fce7f3':''};color:${orderCategoryFilter==='yearly'?'#db2777':''}">年卡</button>
+        <button class="filter-tab ${orderCategoryFilter==='permanent'?'active':''}" onclick="setOrderCategoryFilter('permanent')" style="background:${orderCategoryFilter==='permanent'?'#f3e8ff':''};color:${orderCategoryFilter==='permanent'?'#7c3aed':''}">永久卡</button>
+      </div>
     </div>` : `
     <div class="toolbar">
       <div class="search-box">
@@ -105,6 +120,7 @@ function renderOrders() {
               <th class="sortable-header" data-field="seq" data-page="orders" data-type="number" title="点击排序">序号 <span class="sort-icon">↕</span></th>
               <th class="sortable-header" data-field="orderNo" data-page="orders" data-type="string" title="点击排序">订单号 <span class="sort-icon">↕</span></th>
               <th class="sortable-header" data-field="wechatName" data-page="orders" data-type="string" title="点击排序">微信昵称 <span class="sort-icon">↕</span></th>
+              <th class="sw-col sortable-header" data-field="wechatId" data-page="orders" data-type="string" style="${swColStyle}" title="点击排序">微信号 <span class="sort-icon">↕</span></th>
               <th class="sortable-header" data-field="productName" data-page="orders" data-type="string" title="点击排序">产品名称 <span class="sort-icon">↕</span></th>
               <th class="sw-col sortable-header" data-field="cardCode" data-page="orders" data-type="string" style="${swColStyle}" title="点击排序">卡密 <span class="sort-icon">↕</span></th>
               <th class="hw-col sortable-header" data-field="portType" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">接口类型 <span class="sort-icon">↕</span></th>
@@ -114,13 +130,14 @@ function renderOrders() {
               <th class="hw-col sortable-header" data-field="expressCompany" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">快递公司 <span class="sort-icon">↕</span></th>
               <th class="hw-col sortable-header" data-field="trackingNo" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">物流单号 <span class="sort-icon">↕</span></th>
               <th class="sortable-header" data-field="orderDate" data-page="orders" data-type="date" title="点击排序">购买日期 <span class="sort-icon">↕</span></th>
+              <th class="hw-col sortable-header" data-field="addedTime" data-page="orders" data-type="string" style="${hwColStyle}" title="点击排序">添加时间 <span class="sort-icon">↕</span></th>
               <th class="sw-col sortable-header" data-field="expireDate" data-page="orders" data-type="date" style="${swColStyle}" title="点击排序">有效期至 <span class="sort-icon">↕</span></th>
               <th class="sw-col" style="${swColStyle}">剩余时间</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            ${pager.items.length === 0 ? `<tr><td colspan="16" class="empty-cell">暂无订单数据</td></tr>` :
+            ${pager.items.length === 0 ? `<tr><td colspan="18" class="empty-cell">暂无订单数据</td></tr>` :
               pager.items.map((o, idx) => {
                 const isChecked = orderSelected.includes(o.id);
                 const pName = o.productName || '-';
@@ -149,13 +166,22 @@ function renderOrders() {
                   ? (o.expireDate || '-')
                   : '-';
                 const remainCell = o.type === 'software' && o.expireDate
-                  ? formatRemainingTime(o.expireDate)
+                  ? formatRemainingTime(o.expireDate, o.cardCategory)
+                  : '-';
+                // 软件订单：微信号列（点击可复制）
+                const wechatIdCell = o.type === 'software' && o.wechatId
+                  ? `<span class="card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制微信号" onclick="copyToClipboard('${(o.wechatId||'').replace(/'/g,"\\'")}','微信号已复制')">${o.wechatId}</span>`
+                  : '-';
+                // 硬件订单：添加时间
+                const hwAddedTimeCell = o.type === 'hardware' && o.addedTime
+                  ? `<span style="font-size:12px;color:#94a3b8;">${o.addedTime}</span>`
                   : '-';
                 return `<tr class="${rowClass}">
                   <td><input type="checkbox" class="order-cb" value="${o.id}" ${isChecked?'checked':''} onchange="onOrderCheckChange('${o.id}', this.checked)"></td>
                   <td>${(orderPage-1)*15+idx+1}</td>
                   <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${o.orderNo||'-'}</td>
                   <td>${o.wechatName||'-'}</td>
+                  <td class="sw-col" style="${swColStyle}">${wechatIdCell}</td>
                   <td style="white-space:normal;word-break:break-all;min-width:160px;max-width:220px;">${pName}</td>
                   <td class="sw-col" style="${swColStyle}white-space:nowrap;">${cardCell}</td>
                   <td class="hw-col" style="${hwColStyle}">${o.portType ? `<span class="badge badge-gray">${o.portType}口</span>` : '-'}</td>
@@ -165,6 +191,7 @@ function renderOrders() {
                   <td class="hw-col" style="${hwColStyle}">${extraCol}</td>
                   <td class="hw-col" style="${hwColStyle}">${o.trackingNo ? `<span class="mono card-clickcopy" style="color:#7dd3fc;cursor:pointer;font-size:12px;" title="点击复制物流单号" onclick="copyToClipboard('${(o.trackingNo||'').replace(/'/g,"\\'")}','物流单号已复制')">${o.trackingNo}</span>` : '-'}</td>
                   <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
+                  <td class="hw-col" style="${hwColStyle}">${hwAddedTimeCell}</td>
                   <td class="sw-col" style="${swColStyle} white-space:nowrap;font-size:12px;">${expireCell}</td>
                   <td class="sw-col" style="${swColStyle} white-space:nowrap;">${remainCell}</td>
                   <td class="action-cell">
@@ -187,6 +214,14 @@ function renderOrders() {
 
 function setOrderFilter(f) {
   orderFilter = f;
+  orderCategoryFilter = ''; // 切换类型时重置分类筛选
+  orderPage = 1;
+  renderOrders();
+}
+
+// 软件订单分类筛选
+function setOrderCategoryFilter(cat) {
+  orderCategoryFilter = cat;
   orderPage = 1;
   renderOrders();
 }
@@ -305,7 +340,17 @@ function showAddOrderModal(defaultType = 'software', prefill = {}) {
       <div id="sw-fields" style="display:${type==='software'?'contents':'none'}">
         <!-- 调整5：卡密选择优化 —— 点击直接显示所有卡密，支持分类筛选，支持输入新卡密 -->
         <div class="form-group form-full sw-field">
-          <label class="form-label">卡密选择</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <label class="form-label" style="margin:0">卡密选择</label>
+            <div id="card-stock-info" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+              <span class="badge" style="background:#fef3c7;color:#d97706;font-size:10px;">临:${db.cards?db.cards.filter(c=>c.category==='temp'&&c.status==='unused').length:'0'}</span>
+              <span class="badge" style="background:#dbeafe;color:#2563eb;font-size:10px;">月:${db.cards?db.cards.filter(c=>c.category==='monthly'&&c.status==='unused').length:'0'}</span>
+              <span class="badge" style="background:#dcfce7;color:#16a34a;font-size:10px;">季:${db.cards?db.cards.filter(c=>c.category==='quarterly'&&c.status==='unused').length:'0'}</span>
+              <span class="badge" style="background:#e0e7ff;color:#4f46e5;font-size:10px;">半:${db.cards?db.cards.filter(c=>c.category==='halfyear'&&c.status==='unused').length:'0'}</span>
+              <span class="badge" style="background:#fce7f3;color:#db2777;font-size:10px;">年:${db.cards?db.cards.filter(c=>c.category==='yearly'&&c.status==='unused').length:'0'}</span>
+              <span class="badge" style="background:#f3e8ff;color:#7c3aed;font-size:10px;">永:${db.cards?db.cards.filter(c=>c.category==='permanent'&&c.status==='unused').length:'0'}</span>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <select class="form-select" id="of-cardCatFilter" style="width:110px" onchange="showAllCardDropdown()">
               <option value="">全部分类</option>
@@ -1068,6 +1113,7 @@ function saveOrder(editId = null) {
     order.trackingNo = document.getElementById('of-trackingNo')?.value || '';
     order.btName = document.getElementById('of-btName')?.value || '';
     order.btMac = document.getElementById('of-btMac')?.value || '';
+    order.addedTime = getFullDatetime(); // 硬件订单添加时间
   }
 
   if (editId) {
